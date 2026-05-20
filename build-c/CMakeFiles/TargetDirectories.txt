@@ -1,4 +1,0 @@
-/home/runner/work/rk_benchmark/rk_benchmark/build-c/CMakeFiles/rk_lib.dir
-/home/runner/work/rk_benchmark/rk_benchmark/build-c/CMakeFiles/rk_benchmark.dir
-/home/runner/work/rk_benchmark/rk_benchmark/build-c/CMakeFiles/edit_cache.dir
-/home/runner/work/rk_benchmark/rk_benchmark/build-c/CMakeFiles/rebuild_cache.dir

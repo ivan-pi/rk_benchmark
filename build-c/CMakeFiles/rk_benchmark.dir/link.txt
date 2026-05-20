@@ -1,1 +1,0 @@
-/usr/bin/gfortran -Wl,--dependency-file=CMakeFiles/rk_benchmark.dir/link.d -O3 CMakeFiles/rk_benchmark.dir/rk_benchmark.f90.o CMakeFiles/rk_benchmark.dir/robertson_models.f90.o -o rk_benchmark  librk_lib.a

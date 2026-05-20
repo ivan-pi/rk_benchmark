@@ -1,2 +1,0 @@
-/usr/bin/ar qc librk_lib.a CMakeFiles/rk_lib.dir/rk_kinds.f90.o CMakeFiles/rk_lib.dir/rk_types.f90.o CMakeFiles/rk_lib.dir/rk_solvers.f90.o CMakeFiles/rk_lib.dir/rk_c_solver.f90.o CMakeFiles/rk_lib.dir/rk23_cptr_external.c.o
-/usr/bin/ranlib librk_lib.a
