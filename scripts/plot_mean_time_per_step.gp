@@ -1,7 +1,5 @@
 set terminal pngcairo size 1200,700 enhanced font "Arial,11"
 set output "scripts/mean_time_per_step.png"
-set datafile separator "\t"
-
 set title "RK23 benchmark: mean time per step"
 set ylabel "Mean time per step (us)"
 set xlabel "Approach"
@@ -14,4 +12,4 @@ set xtics rotate by -20 right
 set key off
 
 system "./build/rk_benchmark > /dev/null"
-plot "build/mean_time_per_step.tsv" using 2:xtic(1) title "us/step"
+plot "build/mean_time_per_step.dat" using 2:xticlabels(3) title "us/step"
