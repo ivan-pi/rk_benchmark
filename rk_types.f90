@@ -15,8 +15,8 @@ module rk_types
       integer,  intent(in)  :: neqn
       real(dp), intent(in)  :: t, y(neqn)
       real(dp), intent(out) :: ydot(neqn)
-      real(dp), intent(inout) :: rpar(:)
-      integer,  intent(inout) :: ipar(:)
+      real(dp), intent(inout) :: rpar(*)
+      integer,  intent(inout) :: ipar(*)
     end subroutine func_par
 
     subroutine func_cptr(neqn, t, y, ydot, ctx) bind(c)

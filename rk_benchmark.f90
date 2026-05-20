@@ -9,7 +9,7 @@ program rk_benchmark
   integer,  parameter :: neqn = 3, N_runs = 100
   real(dp), parameter :: y_init(neqn) = [1.0_dp, 0.0_dp, 0.0_dp]
   real(dp), parameter :: t_start = 0.0_dp, t_end = 100.0_dp
-  real(dp), parameter :: atol = 1.0e-8_dp, rtol = 1.0e-8_dp
+  real(dp), parameter :: atol(neqn) = 1.0e-8_dp, rtol = 1.0e-8_dp
 
   real(dp) :: y(neqn), t, h
   real(dp), target :: work(neqn, 5)
