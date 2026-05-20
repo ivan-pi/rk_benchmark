@@ -36,21 +36,33 @@ See [EXTRA.md](EXTRA.md) for a detailed description of each strategy.
 ```
 rk_kinds.f90         – kind parameter (dp = c_double) and iso_c_binding imports
 rk_types.f90         – abstract interfaces and the ode_functor base type
-rk_solvers.f90       – six solver variants (rk23_simple … rk23_class_star)
+rk_solvers.f90       – solver variants plus the explicit-interface wrapper for the optional external C rk23_cptr solver
+rk23_cptr_external.c – optional C implementation of the rk23_cptr solver
 robertson_models.f90 – Robertson RHS implementations for each strategy
-rk_benchmark.f90     – driver: reports mean time per integration over N_runs loops
+rk_benchmark.F90     – driver: reports mean time per integration over N_runs loops
+euler_benchmark.f90  – fixed-step forward Euler benchmark using the same Robertson callback variants
 scripts/             – helper scripts and reference implementations
 CMakeLists.txt       – build system
 ```
 
 ## Building and running
 
-**Requirements:** GFortran ≥ 9 (or equivalent Fortran 2008 compiler) and CMake ≥ 3.30.
+**Requirements:** GFortran ≥ 9 (or equivalent Fortran 2008 compiler), a C compiler, and CMake ≥ 3.30.
 
 ```bash
 git clone https://github.com/ivan-pi/rk_benchmark.git
 cd rk_benchmark
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j
+./build/rk_benchmark [N_runs]
+./build/euler_benchmark [N_runs]
+```
+
+To benchmark strategy 3 with the optional external C solver implementation instead
+of the Fortran module version, configure with:
+
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DENABLE_C_SOLVER=ON
 cmake --build build -j
 ./build/rk_benchmark [N_runs]
 ```

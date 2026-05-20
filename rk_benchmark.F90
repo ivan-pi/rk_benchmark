@@ -1,7 +1,12 @@
 program rk_benchmark
   use rk_kinds
   use rk_types
-  use rk_solvers
+  use rk_solvers, only: rk23_simple, rk23_par, rk23_tb, rk23_rci, rk23_class_star, rk_stats
+#ifdef USE_EXTERNAL_C_RK23
+  use rk_solvers, only: rk23_cptr => rk23_cptr_external
+#else
+  use rk_solvers, only: rk23_cptr
+#endif
   use robertson_models
   use iso_fortran_env, only: error_unit
   implicit none
