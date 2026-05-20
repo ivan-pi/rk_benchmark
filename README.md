@@ -65,6 +65,7 @@ gnuplot scripts/plot_mean_time_per_step.gp
 ## Interpreting results
 
 ```
+--------------------------------------------------------------------------------
                          Interface   Mean(s)   Steps     Rej    NFev     us/step
 --------------------------------------------------------------------------------
  1. F77 Ext. (implicit iface)         0.0126  137206       8  411643      0.0916
@@ -76,7 +77,7 @@ gnuplot scripts/plot_mean_time_per_step.gp
 --------------------------------------------------------------------------------
 ```
 
-* **Mean(s)** — wall time for 100 integrations.
+* **Mean(s)** — mean wall time for a single integration, averaged over N_runs (default: 100) runs.
 * **Steps / Rej** — accepted and rejected steps (identical across strategies;
   a mismatch would indicate a bug).
 * **NFev** — right-hand-side evaluations.
