@@ -164,13 +164,13 @@ program rk_benchmark
 
   ! ----------------------------------------------------------------------------
   ! Callback overhead analysis
-  !   speed_up(i) = elapsed_all(1) / elapsed_all(i), i = 2..6
-  !   Values > 1: method i is faster than the F77 baseline (no penalty)
-  !   Values < 1: method i is slower (overhead relative to F77 implicit iface)
+  !   penalty(i) = elapsed_all(i) / elapsed_all(1), i = 2..6
+  !   Values > 1: method i is slower than the F77 baseline (overhead penalty)
+  !   Values < 1: method i is faster than the F77 baseline
   !   Geometric mean of these ratios is the overall callback overhead score.
   ! ----------------------------------------------------------------------------
   block
-    real(dp) :: speed_up(5), log_sum, geo_mean
+    real(dp) :: penalty(5), log_sum, geo_mean
     integer  :: j
     character(len=30), parameter :: cb_labels(5) = [ &
       "Callback with RPAR/IPAR       ", &
@@ -181,25 +181,28 @@ program rk_benchmark
 
     write(*,'(A)') ""
     write(*,'(A)') repeat("-", 80)
-    write(*,'(A)') "Callback speed-up vs. F77 External (Test 1, implicit interface):"
-    write(*,'(A4,A30,A12)') "", "Interface", "Speed-up"
+    write(*,'(A)') "Callback overhead vs. F77 External (Test 1, implicit interface):"
+    write(*,'(A4,A30,A12)') "", "Interface", "Penalty"
     write(*,'(A)') repeat("-", 80)
 
     log_sum = 0.0_dp
     do j = 1, 5
-      speed_up(j) = elapsed_all(1) / elapsed_all(j + 1)
-      log_sum = log_sum + log(speed_up(j))
-      write(*,'(I2,A2,A30,F12.4)') j+1, ". ", cb_labels(j), speed_up(j)
+      penalty(j) = elapsed_all(j + 1) / elapsed_all(1)
+      log_sum = log_sum + log(penalty(j))
+      write(*,'(I2,A2,A30,F12.4)') j+1, ". ", cb_labels(j), penalty(j)
     end do
 
     geo_mean = exp(log_sum / 5.0_dp)
     write(*,'(A)') repeat("-", 80)
     write(*,'(A,F8.4)') &
-      "Geometric mean speed-up (callback overhead penalty score): ", geo_mean
+      "Geometric mean penalty (callback overhead score): ", geo_mean
     write(*,'(A)') &
-      "  score > 1.0 : callbacks faster than F77 implicit interface"
+      "  score > 1.0 : callbacks slower  (overhead relative to F77)"
     write(*,'(A)') &
-      "  score < 1.0 : callbacks slower  (overhead relative to F77)"
+      "  score < 1.0 : callbacks faster than F77 implicit interface"
+    write(*,'(A)') ""
+    write(*,'(A)') "Note: scores may vary between runs due to runtime load, cache effects, etc."
+    write(*,'(A)') "      Results must be interpreted with care."
   end block
 
 contains
