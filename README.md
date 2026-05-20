@@ -164,6 +164,18 @@ cmake --build build
 ./build/rk_benchmark
 ```
 
+## Plot mean time per step
+
+From the repository root, run:
+
+```bash
+gnuplot scripts/plot_mean_time_per_step.gp
+```
+
+This runs `./build/rk_benchmark`, pipes the benchmark table through
+`scripts/extract_mean_time_per_step.awk`, and writes a bar chart to
+`scripts/mean_time_per_step.png`.
+
 Example output (timings will vary by machine):
 
 ```
