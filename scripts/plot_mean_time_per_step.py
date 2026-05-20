@@ -3,14 +3,14 @@
 Generate a horizontal benchmark bar chart using matplotlib.
 
 Usage (from repository root):
-  python3 scripts/plot_mean_time_per_step.py
+  ./build/rk_benchmark | awk -f scripts/extract_mean_time_per_step.awk > results.txt
+  python3 scripts/plot_mean_time_per_step.py results.txt
 """
 
 from __future__ import annotations
 
 import csv
-import io
-import subprocess
+import sys
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -18,44 +18,32 @@ import matplotlib.pyplot as plt
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = REPO_ROOT / "scripts" / "mean_time_per_step_py.png"
-AWK_SCRIPT = REPO_ROOT / "scripts" / "extract_mean_time_per_step.awk"
 
 
-def extract_rows() -> tuple[list[str], list[float]]:
-    with subprocess.Popen(
-        ["./build/rk_benchmark"],
-        cwd=REPO_ROOT,
-        stdout=subprocess.PIPE,
-        text=True,
-    ) as bench_proc:
-        result = subprocess.run(
-            ["awk", "-f", str(AWK_SCRIPT)],
-            stdin=bench_proc.stdout,
-            cwd=REPO_ROOT,
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-        if bench_proc.stdout is not None:
-            bench_proc.stdout.close()
-        bench_proc.wait()
-    if bench_proc.returncode != 0:
-        raise RuntimeError("rk_benchmark exited with a non-zero status.")
+def extract_rows(results_file: Path) -> tuple[list[str], list[float]]:
     labels: list[str] = []
     values: list[float] = []
-    reader = csv.reader(io.StringIO(result.stdout), delimiter="\t")
-    for row in reader:
-        if len(row) != 2:
-            continue
-        labels.append(row[0])
-        values.append(float(row[1]))
+    with results_file.open(newline="", encoding="utf-8") as f:
+        reader = csv.reader(f, delimiter="\t")
+        for row in reader:
+            if len(row) != 2:
+                continue
+            labels.append(row[0])
+            values.append(float(row[1]))
     if not labels:
-        raise RuntimeError("No benchmark rows parsed from rk_benchmark output.")
+        raise RuntimeError(f"No benchmark rows parsed from: {results_file}")
     return labels, values
 
 
 def main() -> None:
-    labels, values = extract_rows()
+    if len(sys.argv) != 2:
+        raise SystemExit("Usage: python3 scripts/plot_mean_time_per_step.py <results.tsv>")
+
+    results_file = Path(sys.argv[1]).expanduser()
+    if not results_file.is_absolute():
+        results_file = REPO_ROOT / results_file
+
+    labels, values = extract_rows(results_file)
     fig, ax = plt.subplots(figsize=(12, 6.5))
     bars = ax.barh(labels, values, color="#6fa8dc")
     ax.set_xlabel("Mean time per step (us)")
