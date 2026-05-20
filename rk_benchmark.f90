@@ -24,8 +24,8 @@ program rk_benchmark
   type(c_ptr) :: p_data
   type(robertson_functor) :: sys
   integer(8) :: t1, t2, count_rate
-  real(dp)   :: elapsed
-  real(dp)   :: elapsed_all(6)   ! store elapsed time per test for overhead analysis
+  real(dp)   :: elapsed, mean_elapsed
+  real(dp)   :: elapsed_all(6)   ! store mean elapsed time per integration
 
   work = 0.0_dp
 
@@ -35,7 +35,7 @@ program rk_benchmark
   write(*,'(A,I0)') "Integrations per test: ", N_runs
   write(*,'(A)') repeat("-", 80)
   write(*,'(A4,A30,A10,A8,A8,A8,A12,A12)') &
-    "", "Interface", "Time(s)", "Steps", "Rej", "NFev", "us/step", "us/NFev"
+    "", "Interface", "Mean(s)", "Steps", "Rej", "NFev", "us/step", "us/NFev"
   write(*,'(A)') repeat("-", 80)
 
   ! ----------------------------------------------------------------------------
@@ -51,8 +51,9 @@ program rk_benchmark
   end do
   call system_clock(t2)
   elapsed = real(t2-t1, dp)/real(count_rate, dp)
-  elapsed_all(1) = elapsed
-  call print_row(1, "F77 Ext. (implicit iface)", elapsed, N_runs, stats, y)
+  mean_elapsed = elapsed / real(N_runs, dp)
+  elapsed_all(1) = mean_elapsed
+  call print_row(1, "F77 Ext. (implicit iface)", mean_elapsed, stats, y)
 
 
   ! ----------------------------------------------------------------------------
@@ -67,8 +68,9 @@ program rk_benchmark
   end do
   call system_clock(t2)
   elapsed = real(t2-t1, dp)/real(count_rate, dp)
-  elapsed_all(2) = elapsed
-  call print_row(2, "Callback with RPAR/IPAR", elapsed, N_runs, stats, y)
+  mean_elapsed = elapsed / real(N_runs, dp)
+  elapsed_all(2) = mean_elapsed
+  call print_row(2, "Callback with RPAR/IPAR", mean_elapsed, stats, y)
 
 
   ! ----------------------------------------------------------------------------
@@ -84,8 +86,9 @@ program rk_benchmark
   end do
   call system_clock(t2)
   elapsed = real(t2-t1, dp)/real(count_rate, dp)
-  elapsed_all(3) = elapsed
-  call print_row(3, "Callback C-Style (ctx)", elapsed, N_runs, stats, y)
+  mean_elapsed = elapsed / real(N_runs, dp)
+  elapsed_all(3) = mean_elapsed
+  call print_row(3, "Callback C-Style (ctx)", mean_elapsed, stats, y)
 
 
   ! ----------------------------------------------------------------------------
@@ -99,8 +102,9 @@ program rk_benchmark
   end do
   call system_clock(t2)
   elapsed = real(t2-t1, dp)/real(count_rate, dp)
-  elapsed_all(4) = elapsed
-  call print_row(4, "Functor Method (OOP)", elapsed, N_runs, stats, y)
+  mean_elapsed = elapsed / real(N_runs, dp)
+  elapsed_all(4) = mean_elapsed
+  call print_row(4, "Functor Method (OOP)", mean_elapsed, stats, y)
 
 
   ! ----------------------------------------------------------------------------
@@ -140,8 +144,9 @@ program rk_benchmark
     end do
     call system_clock(t2)
     elapsed = real(t2-t1, dp)/real(count_rate, dp)
-    elapsed_all(5) = elapsed
-    call print_row(5, "Reverse Communication", elapsed, N_runs, stats, y)
+    mean_elapsed = elapsed / real(N_runs, dp)
+    elapsed_all(5) = mean_elapsed
+    call print_row(5, "Reverse Communication", mean_elapsed, stats, y)
   end block
 
   ! ----------------------------------------------------------------------------
@@ -155,12 +160,14 @@ program rk_benchmark
   end do
   call system_clock(t2)
   elapsed = real(t2-t1, dp)/real(count_rate, dp)
-  elapsed_all(6) = elapsed
-  call print_row(6, "Class(*) Select Type", elapsed, N_runs, stats, y)
+  mean_elapsed = elapsed / real(N_runs, dp)
+  elapsed_all(6) = mean_elapsed
+  call print_row(6, "Class(*) Select Type", mean_elapsed, stats, y)
 
   write(*,'(A)') repeat("-", 80)
-  write(*,'(A)') "Notes: Steps = accepted steps (last run); us/step and us/NFev are means over all runs."
-  write(*,'(A)') "       NFev  = function evaluations (last run); RK23 uses 3 evals per step attempt."
+  write(*,'(A)') "Notes: Mean(s) is the mean time for one integration over all runs."
+  write(*,'(A)') "       Steps and NFev are from the last run; Final Y is printed as a cross-check."
+  write(*,'(A)') "       RK23 uses 3 evals per step attempt."
 
   ! ----------------------------------------------------------------------------
   ! Callback overhead analysis
@@ -216,28 +223,28 @@ contains
     f(3) =  3.0e7_dp * y_ev(2)**2
   end subroutine rhs_internal
 
-  subroutine print_row(id, label, elapsed, nruns, s, y_fin)
-    integer,          intent(in) :: id, nruns
+  subroutine print_row(id, label, mean_elapsed, s, y_fin)
+    integer,          intent(in) :: id
     character(len=*), intent(in) :: label
-    real(dp),         intent(in) :: elapsed
+    real(dp),         intent(in) :: mean_elapsed
     type(rk_stats),   intent(in) :: s
     real(dp),         intent(in) :: y_fin(neqn)
 
     real(dp) :: us_per_step, us_per_nfev
 
     if (s%accepted > 0) then
-      us_per_step = elapsed * 1.0e6_dp / (real(nruns, dp) * real(s%accepted, dp))
+      us_per_step = mean_elapsed * 1.0e6_dp / real(s%accepted, dp)
     else
       us_per_step = 0.0_dp
     end if
     if (s%nfev > 0) then
-      us_per_nfev = elapsed * 1.0e6_dp / (real(nruns, dp) * real(s%nfev, dp))
+      us_per_nfev = mean_elapsed * 1.0e6_dp / real(s%nfev, dp)
     else
       us_per_nfev = 0.0_dp
     end if
 
     write(*,'(I2,A2,A30,F10.4,I8,I8,I8,F12.4,F12.4)') &
-      id, ". ", label, elapsed, s%accepted, s%rejected, s%nfev, &
+      id, ". ", label, mean_elapsed, s%accepted, s%rejected, s%nfev, &
       us_per_step, us_per_nfev
     write(*,'(A36,A,3ES12.4)') "", "Final Y:", y_fin
   end subroutine print_row

@@ -136,7 +136,8 @@ rk_kinds.f90        – kind parameter (dp = c_double) and iso_c_binding imports
 rk_types.f90        – abstract interfaces and the ode_functor base type
 rk_solvers.f90      – six solver variants (rk23_simple … rk23_class_star)
 robertson_models.f90– Robertson RHS implementations for each strategy
-rk_benchmark.f90    – driver program: times each variant over N_runs loops
+rk_benchmark.f90    – driver program: reports mean time per integration over N_runs loops
+scripts/            – helper scripts and reference implementations
 CMakeLists.txt      – build system
 ```
 
@@ -169,10 +170,18 @@ Example output (timings will vary by machine):
 RK23 Final Refactored Benchmark (Clean FSAL Property)
 Integrations per test: 100
 --------------------------------------------------------------------------------
-1. Internal Proc (Host-Data):      0.4821 s | Final Y:      1.0000      0.0000      0.0000
-2. Callback with RPAR/IPAR:        0.4835 s | Final Y:      1.0000      0.0000      0.0000
-3. Callback C-Style (ctx):         0.4902 s | Final Y:      1.0000      0.0000      0.0000
-4. Functor Method (OOP):           0.5013 s | Final Y:      1.0000      0.0000      0.0000
-5. Reverse Communication:          0.4798 s | Final Y:      1.0000      0.0000      0.0000
-6. Class(*) Select Type:           0.5142 s | Final Y:      1.0000      0.0000      0.0000
+    Interface                       Mean(s)   Steps     Rej    NFev     us/step     us/NFev
+ --------------------------------------------------------------------------------
+ 1. F77 Ext. (implicit iface)        0.0048      80      59     418     60.3        11.6
+                                    Final Y:  1.0000E+00  1.7931E-06  5.6539E-07
+ 2. Callback with RPAR/IPAR          0.0048      80      59     418     60.4        11.6
+                                    Final Y:  1.0000E+00  1.7931E-06  5.6539E-07
+ 3. Callback C-Style (ctx)           0.0049      80      59     418     61.3        11.7
+                                    Final Y:  1.0000E+00  1.7931E-06  5.6539E-07
+ 4. Functor Method (OOP)             0.0050      80      59     418     62.4        12.0
+                                    Final Y:  1.0000E+00  1.7931E-06  5.6539E-07
+ 5. Reverse Communication            0.0048      80      59     418     60.0        11.5
+                                    Final Y:  1.0000E+00  1.7931E-06  5.6539E-07
+ 6. Class(*) Select Type             0.0051      80      59     418     63.8        12.2
+                                    Final Y:  1.0000E+00  1.7931E-06  5.6539E-07
 ```
