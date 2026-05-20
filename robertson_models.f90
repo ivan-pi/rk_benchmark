@@ -26,8 +26,8 @@ contains
     integer, intent(in) :: neqn
     real(dp), intent(in) :: t, y(neqn)
     real(dp), intent(out) :: ydot(neqn)
-    real(dp), intent(inout) :: rpar(:)
-    integer, intent(inout) :: ipar(:)
+    real(dp), intent(inout) :: rpar(*)
+    integer, intent(inout) :: ipar(*)
     ydot(1) = -rpar(1)*y(1) + rpar(2)*y(2)*y(3)
     ydot(2) =  rpar(1)*y(1) - rpar(2)*y(2)*y(3) - rpar(3)*y(2)**2
     ydot(3) =  rpar(3)*y(2)**2

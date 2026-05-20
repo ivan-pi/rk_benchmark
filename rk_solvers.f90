@@ -15,11 +15,16 @@ contains
 
   pure function weighted_norm(n, y_old, y_next, err_vec, a_tol, r_tol) result(err_val)
     integer, intent(in)  :: n
-    real(dp), intent(in) :: y_old(n), y_next(n), err_vec(n), a_tol, r_tol
-    real(dp) :: err_val, scale_vec(n)
+    real(dp), intent(in) :: y_old(n), y_next(n), err_vec(n), a_tol(n), r_tol
+    real(dp) :: err_val, scale_i, sum_sq
+    integer :: i
 
-    scale_vec = a_tol + max(abs(y_old), abs(y_next)) * r_tol
-    err_val = sqrt( sum((err_vec / scale_vec)**2) / n )
+    sum_sq = 0.0_dp
+    do i = 1, n
+      scale_i = a_tol(i) + max(abs(y_old(i)), abs(y_next(i))) * r_tol
+      sum_sq = sum_sq + (err_vec(i) / scale_i)**2
+    end do
+    err_val = sqrt(sum_sq / n)
   end function weighted_norm
 
   ! ============================================================================
@@ -29,7 +34,7 @@ contains
     integer, intent(in) :: neqn
     procedure(func_simple) :: fun
     real(dp), intent(inout) :: t, y(neqn), h
-    real(dp), intent(in)    :: tend, atol, rtol
+    real(dp), intent(in)    :: tend, atol(neqn), rtol
     real(dp), intent(inout) :: work(neqn, 5)
     integer,  intent(out)   :: idid
 
@@ -94,10 +99,10 @@ contains
     integer, intent(in) :: neqn
     procedure(func_par) :: fun
     real(dp), intent(inout) :: t, y(neqn), h
-    real(dp), intent(in)    :: tend, atol, rtol
+    real(dp), intent(in)    :: tend, atol(neqn), rtol
     real(dp), intent(inout) :: work(neqn, 5)
-    real(dp), intent(inout) :: rpar(:)
-    integer,  intent(inout) :: ipar(:)
+    real(dp), intent(inout) :: rpar(*)
+    integer,  intent(inout) :: ipar(*)
     integer,  intent(out)   :: idid
 
     real(dp) :: err, fac, y_new(neqn)
@@ -159,7 +164,7 @@ contains
     integer, intent(in) :: neqn
     procedure(func_cptr) :: fun
     real(dp), intent(inout) :: t, y(neqn), h
-    real(dp), intent(in)    :: tend, atol, rtol
+    real(dp), intent(in)    :: tend, atol(neqn), rtol
     real(dp), intent(inout) :: work(neqn, 5)
     type(c_ptr), value      :: ctx
     integer,  intent(out)   :: idid
@@ -223,7 +228,7 @@ contains
     integer, intent(in) :: neqn
     class(ode_functor), intent(inout) :: fun
     real(dp), intent(inout) :: t, y(neqn), h
-    real(dp), intent(in)    :: tend, atol, rtol
+    real(dp), intent(in)    :: tend, atol(neqn), rtol
     real(dp), intent(inout) :: work(neqn, 5)
     integer,  intent(out)   :: idid
 
@@ -288,7 +293,7 @@ contains
     integer,  intent(inout) :: stage
     integer,  intent(in)    :: neqn
     real(dp), intent(inout) :: t, y(neqn), h
-    real(dp), intent(in)    :: tend, atol, rtol
+    real(dp), intent(in)    :: tend, atol(neqn), rtol
     real(dp), intent(inout) :: work(neqn, 5)
     real(dp), intent(out)   :: t_eval, y_eval(neqn)
     integer,  intent(out)   :: idid
@@ -344,7 +349,7 @@ contains
     integer, intent(in) :: neqn
     procedure(func_class_star) :: fun
     real(dp), intent(inout) :: t, y(neqn), h
-    real(dp), intent(in)    :: tend, atol, rtol
+    real(dp), intent(in)    :: tend, atol(neqn), rtol
     real(dp), intent(inout) :: work(neqn, 5)
     class(*), intent(inout) :: ctx
     integer,  intent(out)   :: idid
