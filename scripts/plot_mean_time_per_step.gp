@@ -12,4 +12,4 @@ set boxwidth 0.8
 set xtics rotate by -20 right
 set key off
 
-plot "< ./build/rk_benchmark | awk '/^[[:space:]]*[1-6]\\./ { label = substr($0,5,30); gsub(/^[[:space:]]+|[[:space:]]+$/, \"\", label); us = substr($0,69,12) + 0; print label \"\\t\" us }'" using 2:xtic(1) title "us/step"
+plot "< ./build/rk_benchmark | awk '/^[[:space:]]*[1-6]\\./ && length($0) >= 80 { label = substr($0,5,30); gsub(/^[[:space:]]+|[[:space:]]+$/, \"\", label); us = substr($0,69,12) + 0; print label \"\\t\" us }'" using 2:xtic(1) title "us/step"
