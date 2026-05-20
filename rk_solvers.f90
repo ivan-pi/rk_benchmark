@@ -73,20 +73,20 @@ contains
     subroutine rk23_step(n, fn, t_cur, dt, y_cur, k1, k2, k3, k4, tmp, a_tol, r_tol, y_next, err_val)
       integer,  intent(in)  :: n
       procedure(func_simple) :: fn
-      real(dp), intent(in)  :: t_cur, dt, y_cur(*), k1(*), a_tol(*), r_tol
-      real(dp), intent(out) :: k2(*), k3(*), k4(*), tmp(*), y_next(*), err_val
+      real(dp), intent(in)  :: t_cur, dt, y_cur(n), k1(n), a_tol(n), r_tol
+      real(dp), intent(out) :: k2(n), k3(n), k4(n), tmp(n), y_next(n), err_val
 
-      tmp(1:n) = y_cur(1:n) + dt * 0.5_dp * k1(1:n)
+      tmp = y_cur + dt * 0.5_dp * k1
       call fn(n, t_cur + 0.5_dp*dt, tmp, k2)
 
-      tmp(1:n) = y_cur(1:n) + dt * 0.75_dp * k2(1:n)
+      tmp = y_cur + dt * 0.75_dp * k2
       call fn(n, t_cur + 0.75_dp*dt, tmp, k3)
 
-      y_next(1:n) = y_cur(1:n) + dt * ((2.0_dp/9.0_dp)*k1(1:n) + (1.0_dp/3.0_dp)*k2(1:n) + (4.0_dp/9.0_dp)*k3(1:n))
+      y_next = y_cur + dt * ((2.0_dp/9.0_dp)*k1 + (1.0_dp/3.0_dp)*k2 + (4.0_dp/9.0_dp)*k3)
       call fn(n, t_cur + dt, y_next, k4)
 
-      tmp(1:n) = dt * (-5.0_dp/72.0_dp * k1(1:n) + 1.0_dp/12.0_dp * k2(1:n) + &
-                        1.0_dp/9.0_dp * k3(1:n) - 1.0_dp/8.0_dp * k4(1:n))
+      tmp = dt * (-5.0_dp/72.0_dp * k1 + 1.0_dp/12.0_dp * k2 + &
+                   1.0_dp/9.0_dp * k3 - 1.0_dp/8.0_dp * k4)
       err_val = weighted_norm(n, y_cur, y_next, tmp, a_tol, r_tol)
     end subroutine rk23_step
 
@@ -140,22 +140,22 @@ contains
     subroutine rk23_step(n, fn, t_cur, dt, y_cur, k1, k2, k3, k4, tmp, a_tol, r_tol, rp, ip, y_next, err_val)
       integer,  intent(in)  :: n
       procedure(func_par) :: fn
-      real(dp), intent(in)  :: t_cur, dt, y_cur(*), k1(*), a_tol(*), r_tol
+      real(dp), intent(in)  :: t_cur, dt, y_cur(n), k1(n), a_tol(n), r_tol
       real(dp), intent(inout) :: rp(*)
       integer,  intent(inout) :: ip(*)
-      real(dp), intent(out) :: k2(*), k3(*), k4(*), tmp(*), y_next(*), err_val
+      real(dp), intent(out) :: k2(n), k3(n), k4(n), tmp(n), y_next(n), err_val
 
-      tmp(1:n) = y_cur(1:n) + dt * 0.5_dp * k1(1:n)
+      tmp = y_cur + dt * 0.5_dp * k1
       call fn(n, t_cur + 0.5_dp*dt, tmp, k2, rp, ip)
 
-      tmp(1:n) = y_cur(1:n) + dt * 0.75_dp * k2(1:n)
+      tmp = y_cur + dt * 0.75_dp * k2
       call fn(n, t_cur + 0.75_dp*dt, tmp, k3, rp, ip)
 
-      y_next(1:n) = y_cur(1:n) + dt * ((2.0_dp/9.0_dp)*k1(1:n) + (1.0_dp/3.0_dp)*k2(1:n) + (4.0_dp/9.0_dp)*k3(1:n))
+      y_next = y_cur + dt * ((2.0_dp/9.0_dp)*k1 + (1.0_dp/3.0_dp)*k2 + (4.0_dp/9.0_dp)*k3)
       call fn(n, t_cur + dt, y_next, k4, rp, ip)
 
-      tmp(1:n) = dt * (-5.0_dp/72.0_dp * k1(1:n) + 1.0_dp/12.0_dp * k2(1:n) + &
-                        1.0_dp/9.0_dp * k3(1:n) - 1.0_dp/8.0_dp * k4(1:n))
+      tmp = dt * (-5.0_dp/72.0_dp * k1 + 1.0_dp/12.0_dp * k2 + &
+                   1.0_dp/9.0_dp * k3 - 1.0_dp/8.0_dp * k4)
       err_val = weighted_norm(n, y_cur, y_next, tmp, a_tol, r_tol)
     end subroutine rk23_step
 
@@ -207,21 +207,21 @@ contains
     subroutine rk23_step(n, fn, t_cur, dt, y_cur, k1, k2, k3, k4, tmp, a_tol, r_tol, cctx, y_next, err_val)
       integer,  intent(in)  :: n
       procedure(func_cptr) :: fn
-      real(dp), intent(in)  :: t_cur, dt, y_cur(*), k1(*), a_tol(*), r_tol
+      real(dp), intent(in)  :: t_cur, dt, y_cur(n), k1(n), a_tol(n), r_tol
       type(c_ptr), value    :: cctx
-      real(dp), intent(out) :: k2(*), k3(*), k4(*), tmp(*), y_next(*), err_val
+      real(dp), intent(out) :: k2(n), k3(n), k4(n), tmp(n), y_next(n), err_val
 
-      tmp(1:n) = y_cur(1:n) + dt * 0.5_dp * k1(1:n)
+      tmp = y_cur + dt * 0.5_dp * k1
       call fn(n, t_cur + 0.5_dp*dt, tmp, k2, cctx)
 
-      tmp(1:n) = y_cur(1:n) + dt * 0.75_dp * k2(1:n)
+      tmp = y_cur + dt * 0.75_dp * k2
       call fn(n, t_cur + 0.75_dp*dt, tmp, k3, cctx)
 
-      y_next(1:n) = y_cur(1:n) + dt * ((2.0_dp/9.0_dp)*k1(1:n) + (1.0_dp/3.0_dp)*k2(1:n) + (4.0_dp/9.0_dp)*k3(1:n))
+      y_next = y_cur + dt * ((2.0_dp/9.0_dp)*k1 + (1.0_dp/3.0_dp)*k2 + (4.0_dp/9.0_dp)*k3)
       call fn(n, t_cur + dt, y_next, k4, cctx)
 
-      tmp(1:n) = dt * (-5.0_dp/72.0_dp * k1(1:n) + 1.0_dp/12.0_dp * k2(1:n) + &
-                        1.0_dp/9.0_dp * k3(1:n) - 1.0_dp/8.0_dp * k4(1:n))
+      tmp = dt * (-5.0_dp/72.0_dp * k1 + 1.0_dp/12.0_dp * k2 + &
+                   1.0_dp/9.0_dp * k3 - 1.0_dp/8.0_dp * k4)
       err_val = weighted_norm(n, y_cur, y_next, tmp, a_tol, r_tol)
     end subroutine rk23_step
 
@@ -272,20 +272,20 @@ contains
     subroutine rk23_step(n, fn, t_cur, dt, y_cur, k1, k2, k3, k4, tmp, a_tol, r_tol, y_next, err_val)
       integer,  intent(in)  :: n
       class(ode_functor), intent(inout) :: fn
-      real(dp), intent(in)  :: t_cur, dt, y_cur(*), k1(*), a_tol(*), r_tol
-      real(dp), intent(out) :: k2(*), k3(*), k4(*), tmp(*), y_next(*), err_val
+      real(dp), intent(in)  :: t_cur, dt, y_cur(n), k1(n), a_tol(n), r_tol
+      real(dp), intent(out) :: k2(n), k3(n), k4(n), tmp(n), y_next(n), err_val
 
-      tmp(1:n) = y_cur(1:n) + dt * 0.5_dp * k1(1:n)
-      call fn%eval(n, t_cur + 0.5_dp*dt, tmp(1:n), k2(1:n))
+      tmp = y_cur + dt * 0.5_dp * k1
+      call fn%eval(n, t_cur + 0.5_dp*dt, tmp, k2)
 
-      tmp(1:n) = y_cur(1:n) + dt * 0.75_dp * k2(1:n)
-      call fn%eval(n, t_cur + 0.75_dp*dt, tmp(1:n), k3(1:n))
+      tmp = y_cur + dt * 0.75_dp * k2
+      call fn%eval(n, t_cur + 0.75_dp*dt, tmp, k3)
 
-      y_next(1:n) = y_cur(1:n) + dt * ((2.0_dp/9.0_dp)*k1(1:n) + (1.0_dp/3.0_dp)*k2(1:n) + (4.0_dp/9.0_dp)*k3(1:n))
-      call fn%eval(n, t_cur + dt, y_next(1:n), k4(1:n))
+      y_next = y_cur + dt * ((2.0_dp/9.0_dp)*k1 + (1.0_dp/3.0_dp)*k2 + (4.0_dp/9.0_dp)*k3)
+      call fn%eval(n, t_cur + dt, y_next, k4)
 
-      tmp(1:n) = dt * (-5.0_dp/72.0_dp * k1(1:n) + 1.0_dp/12.0_dp * k2(1:n) + &
-                        1.0_dp/9.0_dp * k3(1:n) - 1.0_dp/8.0_dp * k4(1:n))
+      tmp = dt * (-5.0_dp/72.0_dp * k1 + 1.0_dp/12.0_dp * k2 + &
+                   1.0_dp/9.0_dp * k3 - 1.0_dp/8.0_dp * k4)
       err_val = weighted_norm(n, y_cur, y_next, tmp, a_tol, r_tol)
     end subroutine rk23_step
 
@@ -395,21 +395,21 @@ contains
     subroutine rk23_step(n, fn, t_cur, dt, y_cur, k1, k2, k3, k4, tmp, a_tol, r_tol, cctx, y_next, err_val)
       integer,  intent(in)  :: n
       procedure(func_class_star) :: fn
-      real(dp), intent(in)  :: t_cur, dt, y_cur(*), k1(*), a_tol(*), r_tol
+      real(dp), intent(in)  :: t_cur, dt, y_cur(n), k1(n), a_tol(n), r_tol
       class(*), intent(inout) :: cctx
-      real(dp), intent(out) :: k2(*), k3(*), k4(*), tmp(*), y_next(*), err_val
+      real(dp), intent(out) :: k2(n), k3(n), k4(n), tmp(n), y_next(n), err_val
 
-      tmp(1:n) = y_cur(1:n) + dt * 0.5_dp * k1(1:n)
+      tmp = y_cur + dt * 0.5_dp * k1
       call fn(n, t_cur + 0.5_dp*dt, tmp, k2, cctx)
 
-      tmp(1:n) = y_cur(1:n) + dt * 0.75_dp * k2(1:n)
+      tmp = y_cur + dt * 0.75_dp * k2
       call fn(n, t_cur + 0.75_dp*dt, tmp, k3, cctx)
 
-      y_next(1:n) = y_cur(1:n) + dt * ((2.0_dp/9.0_dp)*k1(1:n) + (1.0_dp/3.0_dp)*k2(1:n) + (4.0_dp/9.0_dp)*k3(1:n))
+      y_next = y_cur + dt * ((2.0_dp/9.0_dp)*k1 + (1.0_dp/3.0_dp)*k2 + (4.0_dp/9.0_dp)*k3)
       call fn(n, t_cur + dt, y_next, k4, cctx)
 
-      tmp(1:n) = dt * (-5.0_dp/72.0_dp * k1(1:n) + 1.0_dp/12.0_dp * k2(1:n) + &
-                        1.0_dp/9.0_dp * k3(1:n) - 1.0_dp/8.0_dp * k4(1:n))
+      tmp = dt * (-5.0_dp/72.0_dp * k1 + 1.0_dp/12.0_dp * k2 + &
+                   1.0_dp/9.0_dp * k3 - 1.0_dp/8.0_dp * k4)
       err_val = weighted_norm(n, y_cur, y_next, tmp, a_tol, r_tol)
     end subroutine rk23_step
 
