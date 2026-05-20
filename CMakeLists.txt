@@ -9,14 +9,14 @@ target_link_libraries(rk_benchmark PRIVATE rk_lib)
 
 #add_library(robertson_models PLUGIN robertson_models.f90)
 
-option(LTO "Enable link time optimization" OFF)
-if(LTO)
-  set(_lto_flags
-    $<$<Fortran_COMPILER_ID:GNU,Flang,LLVMFlang>:-flto>
-    $<$<Fortran_COMPILER_ID:Intel>:-ipo>
-  )
-  target_compile_options(rk_lib PRIVATE ${_lto_flags})
-  target_link_options(rk_lib PRIVATE ${_lto_flags})
-  target_compile_options(rk_benchmark PRIVATE ${_lto_flags})
-  target_link_options(rk_benchmark PRIVATE ${_lto_flags})
+option(ENABLE_LTO "Enable IPO/LTO" OFF)
+if(ENABLE_LTO)
+  include(CheckIPOSupported)
+  check_ipo_supported(RESULT result OUTPUT output)
+  if(result)
+    set_property(TARGET rk_lib PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
+    set_property(TARGET rk_benchmark PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
+  else()
+    message(WARNING "IPO is not supported: ${output}")
+  endif()
 endif()
