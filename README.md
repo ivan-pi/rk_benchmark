@@ -40,6 +40,7 @@ rk_solvers.f90       – solver variants plus the explicit-interface wrapper for
 rk23_cptr_external.c – optional C implementation of the rk23_cptr solver
 robertson_models.f90 – Robertson RHS implementations for each strategy
 rk_benchmark.F90     – driver: reports mean time per integration over N_runs loops
+euler_benchmark.f90  – fixed-step forward Euler benchmark using the same Robertson callback variants
 scripts/             – helper scripts and reference implementations
 CMakeLists.txt       – build system
 ```
@@ -54,6 +55,7 @@ cd rk_benchmark
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j
 ./build/rk_benchmark [N_runs]
+./build/euler_benchmark [N_runs]
 ```
 
 To benchmark strategy 3 with the optional external C solver implementation instead
@@ -65,7 +67,7 @@ cmake --build build -j
 ./build/rk_benchmark [N_runs]
 ```
 
-To produce a bar-chart PNG of mean time per step:
+To produce a horizontal bar-chart PNG of mean time per step with gnuplot:
 
 ```bash
 gnuplot scripts/plot_mean_time_per_step.gp
