@@ -84,7 +84,7 @@ program rk_benchmark
   t = t_start; y = y_init; h = 1.0e-3_dp
   call rk23_par(neqn, rob_par, t, y, t_end, h, atol, rtol, work, rpar, ipar, idid, stats)
   if (idid == -1) write(error_unit,*) "warm-up 2: step-size underflow!"
-  val_ok = is_consistent(y, y_ref, val_atol, val_rtol)
+  val_ok = is_close(y, y_ref, val_atol, val_rtol)
   if (.not. val_ok) n_fail = n_fail + 1
   vstatus = merge("PASS    ", "FAIL    ", val_ok)
   write(*,'(I2,A2,A30,A8,3ES12.4)') 2, ". ", plot_labels(2), vstatus, y
@@ -96,7 +96,7 @@ program rk_benchmark
   t = t_start; y = y_init; h = 1.0e-3_dp
   call rk23_cptr(neqn, rob_cptr, t, y, t_end, h, atol, rtol, work, p_data, idid, stats)
   if (idid == -1) write(error_unit,*) "warm-up 3: step-size underflow!"
-  val_ok = is_consistent(y, y_ref, val_atol, val_rtol)
+  val_ok = is_close(y, y_ref, val_atol, val_rtol)
   if (.not. val_ok) n_fail = n_fail + 1
   vstatus = merge("PASS    ", "FAIL    ", val_ok)
   write(*,'(I2,A2,A30,A8,3ES12.4)') 3, ". ", plot_labels(3), vstatus, y
@@ -106,40 +106,15 @@ program rk_benchmark
   t = t_start; y = y_init; h = 1.0e-3_dp
   call rk23_tb(neqn, sys, t, y, t_end, h, atol, rtol, work, idid, stats)
   if (idid == -1) write(error_unit,*) "warm-up 4: step-size underflow!"
-  val_ok = is_consistent(y, y_ref, val_atol, val_rtol)
+  val_ok = is_close(y, y_ref, val_atol, val_rtol)
   if (.not. val_ok) n_fail = n_fail + 1
   vstatus = merge("PASS    ", "FAIL    ", val_ok)
   write(*,'(I2,A2,A30,A8,3ES12.4)') 4, ". ", plot_labels(4), vstatus, y
 
   ! 5 – RCI
-  block
-    integer  :: stage
-    real(dp) :: t_eval, y_eval(neqn)
-
-    work = 0.0_dp
-    t = t_start; y = y_init; h = 1.0e-3_dp
-    idid = 0
-    stats = rk_stats()
-    call rob_direct(neqn, t, y, work(:, 1))
-    stats%nfev = stats%nfev + 1
-    stage = 1
-
-    validate5: do
-      call rk23_rci(stage, neqn, t, y, t_end, h, atol, rtol, work, &
-                    t_eval, y_eval, idid, stats)
-      select case(stage)
-      case(2:4)
-        call rob_direct(neqn, t_eval, y_eval, work(:, stage))
-      case(6)
-        if (idid == -1) write(error_unit, '(A)') "warm-up 5: step-size underflow!"
-        exit validate5
-      case default
-        write(error_unit,'(A,I0)') "warm-up rk23_rci unexpected stage = ", stage
-        error stop 1
-      end select
-    end do validate5
-  end block
-  val_ok = is_consistent(y, y_ref, val_atol, val_rtol)
+  t = t_start; y = y_init; h = 1.0e-3_dp
+  call run_rci(t, y, h, idid, stats, "warm-up 5")
+  val_ok = is_close(y, y_ref, val_atol, val_rtol)
   if (.not. val_ok) n_fail = n_fail + 1
   vstatus = merge("PASS    ", "FAIL    ", val_ok)
   write(*,'(I2,A2,A30,A8,3ES12.4)') 5, ". ", plot_labels(5), vstatus, y
@@ -149,7 +124,7 @@ program rk_benchmark
   t = t_start; y = y_init; h = 1.0e-3_dp
   call rk23_class_star(neqn, rob_class_star, t, y, t_end, h, atol, rtol, work, params, idid, stats)
   if (idid == -1) write(error_unit,*) "warm-up 6: step-size underflow!"
-  val_ok = is_consistent(y, y_ref, val_atol, val_rtol)
+  val_ok = is_close(y, y_ref, val_atol, val_rtol)
   if (.not. val_ok) n_fail = n_fail + 1
   vstatus = merge("PASS    ", "FAIL    ", val_ok)
   write(*,'(I2,A2,A30,A8,3ES12.4)') 6, ". ", plot_labels(6), vstatus, y
@@ -243,44 +218,16 @@ program rk_benchmark
   ! ----------------------------------------------------------------------------
   ! 5. Full RCI State-Machine Loop
   ! ----------------------------------------------------------------------------
-  block
-    integer  :: stage
-    real(dp) :: t_eval, y_eval(neqn)
-
-    call system_clock(t1)
-    do i = 1, N_runs
-      t = t_start; y = y_init; h = 1.0e-3_dp
-      work = 0.0_dp
-      idid = 0
-      stats = rk_stats()
-
-      ! Evaluate the initial k1 directly into column 1
-      call rob_direct(neqn, t, y, work(:, 1))
-      stats%nfev = stats%nfev + 1
-      stage = 1
-
-      integrate: do
-        call rk23_rci(stage, neqn, t, y, t_end, h, atol, rtol, work, &
-                      t_eval, y_eval, idid, stats)
-
-        select case(stage)
-        case(2:4)
-          call rob_direct(neqn, t_eval, y_eval, work(:, stage))
-        case(6)
-          if (idid == -1) write(error_unit, '(A)') "5. Step-size underflow!"
-          exit integrate
-        case default
-          write(error_unit,'(A,I0)') "rk23_rci unexpected stage = ", stage
-          error stop 1
-        end select
-      end do integrate
-    end do
-    call system_clock(t2)
-    elapsed = real(t2-t1, dp)/real(count_rate, dp)
-    mean_elapsed = elapsed / real(N_runs, dp)
-    elapsed_all(5) = mean_elapsed
-    call print_row(5, plot_labels(5), mean_elapsed, stats, plot_unit, plot_data_enabled)
-  end block
+  call system_clock(t1)
+  do i = 1, N_runs
+    t = t_start; y = y_init; h = 1.0e-3_dp
+    call run_rci(t, y, h, idid, stats, "5")
+  end do
+  call system_clock(t2)
+  elapsed = real(t2-t1, dp)/real(count_rate, dp)
+  mean_elapsed = elapsed / real(N_runs, dp)
+  elapsed_all(5) = mean_elapsed
+  call print_row(5, plot_labels(5), mean_elapsed, stats, plot_unit, plot_data_enabled)
 
   ! ----------------------------------------------------------------------------
   ! 6. Class(*) / Unlimited Polymorphic Context
@@ -352,18 +299,12 @@ program rk_benchmark
 
 contains
 
-  pure logical function is_consistent(y, y_ref, atol_v, rtol_v)
+  pure logical function is_close(y, y_ref, atol_v, rtol_v)
     real(dp), intent(in) :: y(:), y_ref(:), atol_v, rtol_v
-    integer :: k
-    is_consistent = .true.
-    do k = 1, size(y)
-      if (abs(y(k) - y_ref(k)) > atol_v + rtol_v * abs(y_ref(k))) then
-        is_consistent = .false.
-        return
-      end if
-    end do
-  end function is_consistent
+    is_close = all(abs(y - y_ref) <= atol_v + rtol_v * abs(y_ref))
+  end function is_close
 
+  ! RHS callback passed to rk23_simple (F77-style, implicit interface)
   subroutine rhs_internal(n, t_ev, y_ev, f)
     integer,  intent(in)  :: n
     real(dp), intent(in)  :: t_ev, y_ev(n)
@@ -403,5 +344,48 @@ contains
       end if
     end if
   end subroutine print_row
+
+  ! Runs a single RK23 integration using the reverse communication interface.
+  ! Encapsulates the state-machine loop so it can be called from both the
+  ! validation pass and the benchmark pass without duplication.
+  subroutine run_rci(t, y, h, idid, stats, err_label)
+    real(dp),         intent(inout) :: t, y(neqn), h
+    integer,          intent(out)   :: idid
+    type(rk_stats),   intent(out)   :: stats
+    character(len=*), intent(in), optional :: err_label
+
+    integer  :: stage
+    real(dp) :: t_eval, y_eval(neqn)
+
+    work = 0.0_dp
+    idid = 0
+    stats = rk_stats()
+
+    ! Evaluate the initial k1 directly into column 1
+    call rob_direct(neqn, t, y, work(:, 1))
+    stats%nfev = stats%nfev + 1
+    stage = 1
+
+    rci_loop: do
+      call rk23_rci(stage, neqn, t, y, t_end, h, atol, rtol, work, &
+                    t_eval, y_eval, idid, stats)
+      select case(stage)
+      case(2:4)
+        call rob_direct(neqn, t_eval, y_eval, work(:, stage))
+      case(6)
+        if (idid == -1) then
+          if (present(err_label)) then
+            write(error_unit,'(A,A)') err_label, ": step-size underflow!"
+          else
+            write(error_unit,'(A)') "rk23_rci: step-size underflow!"
+          end if
+        end if
+        exit rci_loop
+      case default
+        write(error_unit,'(A,I0)') "rk23_rci unexpected stage = ", stage
+        error stop 1
+      end select
+    end do rci_loop
+  end subroutine run_rci
 
 end program rk_benchmark
