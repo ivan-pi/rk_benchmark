@@ -29,11 +29,15 @@ contains
   end function weighted_norm
 
   ! ============================================================================
-  ! 1. Internal / Simple Callback Integrator
+  ! 1. F77-Style External Callback Integrator (implicit interface)
+  !    The callback API uses only Fortran 77 features: no intent declarations,
+  !    explicit-size arrays, and an external dummy argument with implicit
+  !    interface.  Per Fortran 2008, an internal procedure may still be passed
+  !    as the actual argument.
   ! ============================================================================
   subroutine rk23_simple(neqn, fun, t, y, tend, h, atol, rtol, work, idid, stats)
     integer, intent(in) :: neqn
-    procedure(func_simple) :: fun
+    external :: fun
     real(dp), intent(inout) :: t, y(neqn), h
     real(dp), intent(in)    :: tend, atol(neqn), rtol
     real(dp), intent(inout) :: work(neqn, 5)
@@ -79,7 +83,7 @@ contains
   contains
     subroutine rk23_step(n, fn, t_cur, dt, y_cur, k1, k2, k3, k4, tmp, a_tol, r_tol, y_next, err_val)
       integer,  intent(in)  :: n
-      procedure(func_simple) :: fn
+      external :: fn
       real(dp), intent(in)  :: t_cur, dt, y_cur(n), k1(n), a_tol(n), r_tol
       real(dp), intent(out) :: k2(n), k3(n), k4(n), tmp(n), y_next(n), err_val
 

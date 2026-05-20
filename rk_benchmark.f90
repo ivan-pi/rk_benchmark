@@ -25,6 +25,7 @@ program rk_benchmark
   type(robertson_functor) :: sys
   integer(8) :: t1, t2, count_rate
   real(dp)   :: elapsed
+  real(dp)   :: elapsed_all(6)   ! store elapsed time per test for overhead analysis
 
   work = 0.0_dp
 
@@ -38,7 +39,9 @@ program rk_benchmark
   write(*,'(A)') repeat("-", 80)
 
   ! ----------------------------------------------------------------------------
-  ! 1. Internal Procedure (Capturing host data)
+  ! 1. F77-Style External Callback (implicit interface)
+  !    rk23_simple uses "external fun" – no explicit interface block.
+  !    We still pass an internal procedure per Fortran 2008 semantics.
   ! ----------------------------------------------------------------------------
   call system_clock(t1)
   do i = 1, N_runs
@@ -48,7 +51,8 @@ program rk_benchmark
   end do
   call system_clock(t2)
   elapsed = real(t2-t1, dp)/real(count_rate, dp)
-  call print_row(1, "Internal Proc (Host-Data)", elapsed, N_runs, stats, y)
+  elapsed_all(1) = elapsed
+  call print_row(1, "F77 Ext. (implicit iface)", elapsed, N_runs, stats, y)
 
 
   ! ----------------------------------------------------------------------------
@@ -63,6 +67,7 @@ program rk_benchmark
   end do
   call system_clock(t2)
   elapsed = real(t2-t1, dp)/real(count_rate, dp)
+  elapsed_all(2) = elapsed
   call print_row(2, "Callback with RPAR/IPAR", elapsed, N_runs, stats, y)
 
 
@@ -79,6 +84,7 @@ program rk_benchmark
   end do
   call system_clock(t2)
   elapsed = real(t2-t1, dp)/real(count_rate, dp)
+  elapsed_all(3) = elapsed
   call print_row(3, "Callback C-Style (ctx)", elapsed, N_runs, stats, y)
 
 
@@ -93,6 +99,7 @@ program rk_benchmark
   end do
   call system_clock(t2)
   elapsed = real(t2-t1, dp)/real(count_rate, dp)
+  elapsed_all(4) = elapsed
   call print_row(4, "Functor Method (OOP)", elapsed, N_runs, stats, y)
 
 
@@ -133,6 +140,7 @@ program rk_benchmark
     end do
     call system_clock(t2)
     elapsed = real(t2-t1, dp)/real(count_rate, dp)
+    elapsed_all(5) = elapsed
     call print_row(5, "Reverse Communication", elapsed, N_runs, stats, y)
   end block
 
@@ -147,11 +155,55 @@ program rk_benchmark
   end do
   call system_clock(t2)
   elapsed = real(t2-t1, dp)/real(count_rate, dp)
+  elapsed_all(6) = elapsed
   call print_row(6, "Class(*) Select Type", elapsed, N_runs, stats, y)
 
   write(*,'(A)') repeat("-", 80)
   write(*,'(A)') "Notes: Steps = accepted steps (last run); us/step and us/NFev are means over all runs."
   write(*,'(A)') "       NFev  = function evaluations (last run); RK23 uses 3 evals per step attempt."
+
+  ! ----------------------------------------------------------------------------
+  ! Callback overhead analysis
+  !   penalty(i) = elapsed_all(i) / elapsed_all(1), i = 2..6
+  !   Values > 1: method i is slower than the F77 baseline (overhead penalty)
+  !   Values < 1: method i is faster than the F77 baseline
+  !   Geometric mean of these ratios is the overall callback overhead score.
+  ! ----------------------------------------------------------------------------
+  block
+    real(dp) :: penalty(5), log_sum, geo_mean
+    integer  :: j
+    character(len=30), parameter :: cb_labels(5) = [ &
+      "Callback with RPAR/IPAR       ", &
+      "Callback C-Style (ctx)        ", &
+      "Functor Method (OOP)          ", &
+      "Reverse Communication         ", &
+      "Class(*) Select Type          "  ]
+
+    write(*,'(A)') ""
+    write(*,'(A)') repeat("-", 80)
+    write(*,'(A)') "Callback overhead vs. F77 External (Test 1, implicit interface):"
+    write(*,'(A4,A30,A12)') "", "Interface", "Penalty"
+    write(*,'(A)') repeat("-", 80)
+
+    log_sum = 0.0_dp
+    do j = 1, 5
+      penalty(j) = elapsed_all(j + 1) / elapsed_all(1)
+      log_sum = log_sum + log(penalty(j))
+      write(*,'(I2,A2,A30,F12.4)') j+1, ". ", cb_labels(j), penalty(j)
+    end do
+
+    geo_mean = exp(log_sum / 5.0_dp)
+    write(*,'(A)') repeat("-", 80)
+    write(*,'(A,F8.4)') &
+      "Geometric mean penalty (callback overhead score): ", geo_mean
+    write(*,'(A)') &
+      "  score > 1.0 : callbacks slower  (overhead relative to F77)"
+    write(*,'(A)') &
+      "  score < 1.0 : callbacks faster than F77 implicit interface"
+    write(*,'(A)') ""
+    write(*,'(A)') "Note: scores may vary between runs due to runtime load, cache effects, etc."
+    write(*,'(A)') "      Results must be interpreted with care."
+  end block
 
 contains
 
