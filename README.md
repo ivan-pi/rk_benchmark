@@ -62,14 +62,6 @@ gnuplot scripts/plot_mean_time_per_step.gp
 # output: scripts/mean_time_per_step.png
 ```
 
-To produce the same horizontal bar-chart with Python/matplotlib:
-
-```bash
-./build/rk_benchmark | awk -f scripts/extract_mean_time_per_step.awk > results.txt
-python3 scripts/plot_mean_time_per_step.py results.txt
-# output: scripts/mean_time_per_step_py.png
-```
-
 ## Interpreting results
 
 ```
