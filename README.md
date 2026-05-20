@@ -4,6 +4,22 @@ A Fortran micro-benchmark that measures the overhead of different **callback
 mechanisms** (strategy-pattern implementations) inside an adaptive
 Runge-Kutta ODE solver.
 
+## Table of contents
+
+- [Purpose](#purpose)
+- [Motivation](#motivation)
+  - [Why the strategy pattern matters](#why-the-strategy-pattern-matters)
+  - [Strategy comparison](#strategy-comparison)
+    - [Internal procedure (strategy 1)](#internal-procedure-strategy-1)
+    - [RPAR / IPAR arrays (strategy 2)](#rpar--ipar-arrays-strategy-2)
+    - [C-style opaque pointer (strategy 3)](#c-style-opaque-pointer-strategy-3)
+    - [Type-bound procedure / OOP functor (strategy 4)](#type-bound-procedure--oop-functor-strategy-4)
+    - [Reverse communication interface (strategy 5)](#reverse-communication-interface-strategy-5)
+    - [Unlimited-polymorphic context `class(*)` (strategy 6)](#unlimited-polymorphic-context-class-strategy-6)
+- [Repository layout](#repository-layout)
+  - [ODE method](#ode-method)
+- [Building and running](#building-and-running)
+
 ## Purpose
 
 Scientific software frequently needs to decouple a *numerical algorithm* from
