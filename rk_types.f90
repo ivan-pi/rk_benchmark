@@ -2,6 +2,13 @@ module rk_types
   use rk_kinds
   implicit none
 
+  ! Statistics collected during a single integration
+  type :: rk_stats
+    integer :: accepted = 0   ! accepted steps
+    integer :: rejected = 0   ! rejected steps
+    integer :: nfev     = 0   ! function evaluations
+  end type rk_stats
+
   abstract interface
     subroutine func_simple(neqn, t, y, ydot)
       import :: dp

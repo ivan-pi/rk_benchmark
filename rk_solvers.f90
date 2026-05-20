@@ -10,6 +10,7 @@ module rk_solvers
 
   public :: rk23_simple, rk23_par, rk23_cptr, rk23_tb
   public :: rk23_rci, rk23_class_star
+  public :: rk_stats
 
 contains
 
@@ -30,19 +31,22 @@ contains
   ! ============================================================================
   ! 1. Internal / Simple Callback Integrator
   ! ============================================================================
-  subroutine rk23_simple(neqn, fun, t, y, tend, h, atol, rtol, work, idid)
+  subroutine rk23_simple(neqn, fun, t, y, tend, h, atol, rtol, work, idid, stats)
     integer, intent(in) :: neqn
     procedure(func_simple) :: fun
     real(dp), intent(inout) :: t, y(neqn), h
     real(dp), intent(in)    :: tend, atol(neqn), rtol
     real(dp), intent(inout) :: work(neqn, 5)
     integer,  intent(out)   :: idid
+    type(rk_stats), intent(out) :: stats
 
     real(dp) :: err, fac, y_new(neqn)
 
     idid = 0
+    stats = rk_stats()
     ! Evaluate initial k1 directly into column 1
     call fun(neqn, t, y, work(:,1))
+    stats%nfev = stats%nfev + 1
 
     integrate: do while (t < tend)
       if (t + h > tend) h = tend - t
@@ -54,6 +58,7 @@ contains
         end if
 
         call rk23_step(neqn, fun, t, h, y, work(:,1), work(:,2), work(:,3), work(:,4), work(:,5), atol, rtol, y_new, err)
+        stats%nfev = stats%nfev + 3
         fac = 0.9_dp * (1.0_dp / max(err, 1.0e-10_dp))**(1.0_dp/3.0_dp)
 
         if (err <= 1.0_dp) then
@@ -61,11 +66,13 @@ contains
           y = y_new
           work(:,1) = work(:,4) ! FSAL: k4 of accepted step becomes k1 of next
           h = h * max(0.2_dp, min(5.0_dp, fac))
+          stats%accepted = stats%accepted + 1
           exit attempt
         end if
 
         ! Rejected: t and y are unchanged, so work(:,1) is still the valid k1
         h = h * max(0.2_dp, min(5.0_dp, fac))
+        stats%rejected = stats%rejected + 1
       end do attempt
     end do integrate
 
@@ -96,7 +103,7 @@ contains
   ! ============================================================================
   ! 2. SLATEC-like Callback (rpar, ipar) Integrator
   ! ============================================================================
-  subroutine rk23_par(neqn, fun, t, y, tend, h, atol, rtol, work, rpar, ipar, idid)
+  subroutine rk23_par(neqn, fun, t, y, tend, h, atol, rtol, work, rpar, ipar, idid, stats)
     integer, intent(in) :: neqn
     procedure(func_par) :: fun
     real(dp), intent(inout) :: t, y(neqn), h
@@ -105,11 +112,14 @@ contains
     real(dp), intent(inout) :: rpar(*)
     integer,  intent(inout) :: ipar(*)
     integer,  intent(out)   :: idid
+    type(rk_stats), intent(out) :: stats
 
     real(dp) :: err, fac, y_new(neqn)
 
     idid = 0
+    stats = rk_stats()
     call fun(neqn, t, y, work(:,1), rpar, ipar)
+    stats%nfev = stats%nfev + 1
 
     integrate: do while (t < tend)
       if (t + h > tend) h = tend - t
@@ -122,6 +132,7 @@ contains
 
         call rk23_step(neqn, fun, t, h, y, work(:,1), work(:,2), work(:,3), &
                        work(:,4), work(:,5), atol, rtol, rpar, ipar, y_new, err)
+        stats%nfev = stats%nfev + 3
         fac = 0.9_dp * (1.0_dp / max(err, 1.0e-10_dp))**(1.0_dp/3.0_dp)
 
         if (err <= 1.0_dp) then
@@ -129,10 +140,12 @@ contains
           y = y_new
           work(:,1) = work(:,4)
           h = h * max(0.2_dp, min(5.0_dp, fac))
+          stats%accepted = stats%accepted + 1
           exit attempt
         end if
 
         h = h * max(0.2_dp, min(5.0_dp, fac))
+        stats%rejected = stats%rejected + 1
       end do attempt
     end do integrate
 
@@ -165,7 +178,7 @@ contains
   ! ============================================================================
   ! 3. C-Pointer Callback Integrator
   ! ============================================================================
-  subroutine rk23_cptr(neqn, fun, t, y, tend, h, atol, rtol, work, ctx, idid)
+  subroutine rk23_cptr(neqn, fun, t, y, tend, h, atol, rtol, work, ctx, idid, stats)
     integer, intent(in) :: neqn
     procedure(func_cptr) :: fun
     real(dp), intent(inout) :: t, y(neqn), h
@@ -173,11 +186,14 @@ contains
     real(dp), intent(inout) :: work(neqn, 5)
     type(c_ptr), value      :: ctx
     integer,  intent(out)   :: idid
+    type(rk_stats), intent(out) :: stats
 
     real(dp) :: err, fac, y_new(neqn)
 
     idid = 0
+    stats = rk_stats()
     call fun(neqn, t, y, work(:,1), ctx)
+    stats%nfev = stats%nfev + 1
 
     integrate: do while (t < tend)
       if (t + h > tend) h = tend - t
@@ -189,6 +205,7 @@ contains
         end if
 
         call rk23_step(neqn, fun, t, h, y, work(:,1), work(:,2), work(:,3), work(:,4), work(:,5), atol, rtol, ctx, y_new, err)
+        stats%nfev = stats%nfev + 3
         fac = 0.9_dp * (1.0_dp / max(err, 1.0e-10_dp))**(1.0_dp/3.0_dp)
 
         if (err <= 1.0_dp) then
@@ -196,10 +213,12 @@ contains
           y = y_new
           work(:,1) = work(:,4)
           h = h * max(0.2_dp, min(5.0_dp, fac))
+          stats%accepted = stats%accepted + 1
           exit attempt
         end if
 
         h = h * max(0.2_dp, min(5.0_dp, fac))
+        stats%rejected = stats%rejected + 1
       end do attempt
     end do integrate
 
@@ -231,18 +250,21 @@ contains
   ! ============================================================================
   ! 4. Functor OOP Class Integrator
   ! ============================================================================
-  subroutine rk23_tb(neqn, fun, t, y, tend, h, atol, rtol, work, idid)
+  subroutine rk23_tb(neqn, fun, t, y, tend, h, atol, rtol, work, idid, stats)
     integer, intent(in) :: neqn
     class(ode_functor), intent(inout) :: fun
     real(dp), intent(inout) :: t, y(neqn), h
     real(dp), intent(in)    :: tend, atol(neqn), rtol
     real(dp), intent(inout) :: work(neqn, 5)
     integer,  intent(out)   :: idid
+    type(rk_stats), intent(out) :: stats
 
     real(dp) :: err, fac, y_new(neqn)
 
     idid = 0
+    stats = rk_stats()
     call fun%eval(neqn, t, y, work(:,1))
+    stats%nfev = stats%nfev + 1
 
     integrate: do while (t < tend)
       if (t + h > tend) h = tend - t
@@ -254,6 +276,7 @@ contains
         end if
 
         call rk23_step(neqn, fun, t, h, y, work(:,1), work(:,2), work(:,3), work(:,4), work(:,5), atol, rtol, y_new, err)
+        stats%nfev = stats%nfev + 3
         fac = 0.9_dp * (1.0_dp / max(err, 1.0e-10_dp))**(1.0_dp/3.0_dp)
 
         if (err <= 1.0_dp) then
@@ -261,10 +284,12 @@ contains
           y = y_new
           work(:,1) = work(:,4)
           h = h * max(0.2_dp, min(5.0_dp, fac))
+          stats%accepted = stats%accepted + 1
           exit attempt
         end if
 
         h = h * max(0.2_dp, min(5.0_dp, fac))
+        stats%rejected = stats%rejected + 1
       end do attempt
     end do integrate
 
@@ -297,7 +322,7 @@ contains
   ! Caller passes k1 into work(:,1) before entering the loop.
   ! ============================================================================
   subroutine rk23_rci(stage, neqn, t, y, tend, h, atol, rtol, work, &
-                      t_eval, y_eval, idid)
+                      t_eval, y_eval, idid, stats)
     integer,  intent(inout) :: stage
     integer,  intent(in)    :: neqn
     real(dp), intent(inout) :: t, y(neqn), h
@@ -305,6 +330,7 @@ contains
     real(dp), intent(inout) :: work(neqn, 5)
     real(dp), intent(out)   :: t_eval, y_eval(neqn)
     integer,  intent(out)   :: idid
+    type(rk_stats), intent(inout) :: stats
 
     real(dp) :: err, fac, err_vec(neqn)
 
@@ -334,10 +360,14 @@ contains
         err = weighted_norm(neqn, y, work(:,5), err_vec, atol, rtol)
         fac = 0.9_dp * (1.0_dp / max(err, 1.0e-10_dp))**(1.0_dp/3.0_dp)
 
+        stats%nfev = stats%nfev + 3
         if (err <= 1.0_dp) then
           t = t + h
           y = work(:,5)
           work(:,1) = work(:,4) ! FSAL: k4 becomes k1
+          stats%accepted = stats%accepted + 1
+        else
+          stats%rejected = stats%rejected + 1
         end if
 
         h = h * max(0.2_dp, min(5.0_dp, fac))
@@ -353,7 +383,7 @@ contains
   ! ============================================================================
   ! 6. Unlimited Polymorphic Class(*) Callback Integrator
   ! ============================================================================
-  subroutine rk23_class_star(neqn, fun, t, y, tend, h, atol, rtol, work, ctx, idid)
+  subroutine rk23_class_star(neqn, fun, t, y, tend, h, atol, rtol, work, ctx, idid, stats)
     integer, intent(in) :: neqn
     procedure(func_class_star) :: fun
     real(dp), intent(inout) :: t, y(neqn), h
@@ -361,11 +391,14 @@ contains
     real(dp), intent(inout) :: work(neqn, 5)
     class(*), intent(inout) :: ctx
     integer,  intent(out)   :: idid
+    type(rk_stats), intent(out) :: stats
 
     real(dp) :: err, fac, y_new(neqn)
 
     idid = 0
+    stats = rk_stats()
     call fun(neqn, t, y, work(:,1), ctx)
+    stats%nfev = stats%nfev + 1
 
     integrate: do while (t < tend)
       if (t + h > tend) h = tend - t
@@ -377,6 +410,7 @@ contains
         end if
 
         call rk23_step(neqn, fun, t, h, y, work(:,1), work(:,2), work(:,3), work(:,4), work(:,5), atol, rtol, ctx, y_new, err)
+        stats%nfev = stats%nfev + 3
         fac = 0.9_dp * (1.0_dp / max(err, 1.0e-10_dp))**(1.0_dp/3.0_dp)
 
         if (err <= 1.0_dp) then
@@ -384,10 +418,12 @@ contains
           y = y_new
           work(:,1) = work(:,4)
           h = h * max(0.2_dp, min(5.0_dp, fac))
+          stats%accepted = stats%accepted + 1
           exit attempt
         end if
 
         h = h * max(0.2_dp, min(5.0_dp, fac))
+        stats%rejected = stats%rejected + 1
       end do attempt
     end do integrate
 
