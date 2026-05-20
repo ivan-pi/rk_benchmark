@@ -36,6 +36,11 @@ program rk_benchmark
   real(dp)   :: elapsed_all(6)   ! store mean elapsed time per integration
   integer    :: plot_unit, io_stat
   logical    :: plot_data_enabled
+  real(dp)   :: y_ref(neqn)        ! reference final state from strategy 1 (warm-up)
+  logical    :: val_ok              ! per-strategy consistency check result
+  integer    :: n_fail              ! count of failed consistency checks
+  character(len=8) :: vstatus       ! validation status string for output
+  real(dp), parameter :: val_atol = 1.0e-6_dp, val_rtol = 1.0e-6_dp
 
   work = 0.0_dp
 
@@ -52,6 +57,115 @@ program rk_benchmark
 
   write(*,'(A)') "RK23 Final Refactored Benchmark (Clean FSAL Property)"
   write(*,'(A,I0)') "Integrations per test: ", N_runs
+
+  ! ============================================================================
+  ! Validation / Warm-Up Pass
+  !   Each strategy is run once to verify consistency against strategy 1.
+  !   Tolerance: |y(i) - y_ref(i)| <= val_atol + val_rtol * |y_ref(i)|
+  ! ============================================================================
+  write(*,'(A)') ""
+  write(*,'(A)') "Validation / Warm-Up Pass"
+  write(*,'(A)') repeat("-", 80)
+  write(*,'(A4,A30,A8,3A12)') "", "Interface", "Status", "Y(1)", "Y(2)", "Y(3)"
+  write(*,'(A)') repeat("-", 80)
+  n_fail = 0
+
+  ! 1 – reference run
+  work = 0.0_dp
+  t = t_start; y = y_init; h = 1.0e-3_dp
+  call rk23_simple(neqn, rhs_internal, t, y, t_end, h, atol, rtol, work, idid, stats)
+  if (idid == -1) write(error_unit,*) "warm-up 1: step-size underflow!"
+  y_ref = y
+  write(*,'(I2,A2,A30,A8,3ES12.4)') 1, ". ", plot_labels(1), "REF     ", y_ref
+
+  ! 2
+  rpar = [0.04_dp, 1.0e4_dp, 3.0e7_dp]
+  work = 0.0_dp
+  t = t_start; y = y_init; h = 1.0e-3_dp
+  call rk23_par(neqn, rob_par, t, y, t_end, h, atol, rtol, work, rpar, ipar, idid, stats)
+  if (idid == -1) write(error_unit,*) "warm-up 2: step-size underflow!"
+  val_ok = is_consistent(y, y_ref, val_atol, val_rtol)
+  if (.not. val_ok) n_fail = n_fail + 1
+  vstatus = merge("PASS    ", "FAIL    ", val_ok)
+  write(*,'(I2,A2,A30,A8,3ES12.4)') 2, ". ", plot_labels(2), vstatus, y
+
+  ! 3
+  c_data%k1 = 0.04_dp; c_data%k2 = 1.0e4_dp; c_data%k3 = 3.0e7_dp
+  p_data = c_loc(c_data)
+  work = 0.0_dp
+  t = t_start; y = y_init; h = 1.0e-3_dp
+  call rk23_cptr(neqn, rob_cptr, t, y, t_end, h, atol, rtol, work, p_data, idid, stats)
+  if (idid == -1) write(error_unit,*) "warm-up 3: step-size underflow!"
+  val_ok = is_consistent(y, y_ref, val_atol, val_rtol)
+  if (.not. val_ok) n_fail = n_fail + 1
+  vstatus = merge("PASS    ", "FAIL    ", val_ok)
+  write(*,'(I2,A2,A30,A8,3ES12.4)') 3, ". ", plot_labels(3), vstatus, y
+
+  ! 4
+  work = 0.0_dp
+  t = t_start; y = y_init; h = 1.0e-3_dp
+  call rk23_tb(neqn, sys, t, y, t_end, h, atol, rtol, work, idid, stats)
+  if (idid == -1) write(error_unit,*) "warm-up 4: step-size underflow!"
+  val_ok = is_consistent(y, y_ref, val_atol, val_rtol)
+  if (.not. val_ok) n_fail = n_fail + 1
+  vstatus = merge("PASS    ", "FAIL    ", val_ok)
+  write(*,'(I2,A2,A30,A8,3ES12.4)') 4, ". ", plot_labels(4), vstatus, y
+
+  ! 5 – RCI
+  block
+    integer  :: stage
+    real(dp) :: t_eval, y_eval(neqn)
+
+    work = 0.0_dp
+    t = t_start; y = y_init; h = 1.0e-3_dp
+    idid = 0
+    stats = rk_stats()
+    call rob_direct(neqn, t, y, work(:, 1))
+    stats%nfev = stats%nfev + 1
+    stage = 1
+
+    validate5: do
+      call rk23_rci(stage, neqn, t, y, t_end, h, atol, rtol, work, &
+                    t_eval, y_eval, idid, stats)
+      select case(stage)
+      case(2:4)
+        call rob_direct(neqn, t_eval, y_eval, work(:, stage))
+      case(6)
+        if (idid == -1) write(error_unit, '(A)') "warm-up 5: step-size underflow!"
+        exit validate5
+      case default
+        write(error_unit,'(A,I0)') "warm-up rk23_rci unexpected stage = ", stage
+        error stop 1
+      end select
+    end do validate5
+  end block
+  val_ok = is_consistent(y, y_ref, val_atol, val_rtol)
+  if (.not. val_ok) n_fail = n_fail + 1
+  vstatus = merge("PASS    ", "FAIL    ", val_ok)
+  write(*,'(I2,A2,A30,A8,3ES12.4)') 5, ". ", plot_labels(5), vstatus, y
+
+  ! 6
+  work = 0.0_dp
+  t = t_start; y = y_init; h = 1.0e-3_dp
+  call rk23_class_star(neqn, rob_class_star, t, y, t_end, h, atol, rtol, work, params, idid, stats)
+  if (idid == -1) write(error_unit,*) "warm-up 6: step-size underflow!"
+  val_ok = is_consistent(y, y_ref, val_atol, val_rtol)
+  if (.not. val_ok) n_fail = n_fail + 1
+  vstatus = merge("PASS    ", "FAIL    ", val_ok)
+  write(*,'(I2,A2,A30,A8,3ES12.4)') 6, ". ", plot_labels(6), vstatus, y
+
+  write(*,'(A)') repeat("-", 80)
+  if (n_fail == 0) then
+    write(*,'(A)') "All strategies consistent with strategy 1 (within tolerance)."
+  else
+    write(*,'(I0,A)') n_fail, " strategy/strategies failed the consistency check!"
+  end if
+
+  ! ============================================================================
+  ! Benchmark Pass
+  ! ============================================================================
+  write(*,'(A)') ""
+  write(*,'(A)') "Benchmark Pass"
   write(*,'(A)') repeat("-", 80)
   write(*,'(A4,A30,A10,A8,A8,A8,A12,A12)') &
     "", "Interface", "Mean(s)", "Steps", "Rej", "NFev", "us/step", "us/NFev"
@@ -72,7 +186,7 @@ program rk_benchmark
   elapsed = real(t2-t1, dp)/real(count_rate, dp)
   mean_elapsed = elapsed / real(N_runs, dp)
   elapsed_all(1) = mean_elapsed
-  call print_row(1, plot_labels(1), mean_elapsed, stats, y, plot_unit, plot_data_enabled)
+  call print_row(1, plot_labels(1), mean_elapsed, stats, plot_unit, plot_data_enabled)
 
 
   ! ----------------------------------------------------------------------------
@@ -89,7 +203,7 @@ program rk_benchmark
   elapsed = real(t2-t1, dp)/real(count_rate, dp)
   mean_elapsed = elapsed / real(N_runs, dp)
   elapsed_all(2) = mean_elapsed
-  call print_row(2, plot_labels(2), mean_elapsed, stats, y, plot_unit, plot_data_enabled)
+  call print_row(2, plot_labels(2), mean_elapsed, stats, plot_unit, plot_data_enabled)
 
 
   ! ----------------------------------------------------------------------------
@@ -107,7 +221,7 @@ program rk_benchmark
   elapsed = real(t2-t1, dp)/real(count_rate, dp)
   mean_elapsed = elapsed / real(N_runs, dp)
   elapsed_all(3) = mean_elapsed
-  call print_row(3, plot_labels(3), mean_elapsed, stats, y, plot_unit, plot_data_enabled)
+  call print_row(3, plot_labels(3), mean_elapsed, stats, plot_unit, plot_data_enabled)
 
 
   ! ----------------------------------------------------------------------------
@@ -123,7 +237,7 @@ program rk_benchmark
   elapsed = real(t2-t1, dp)/real(count_rate, dp)
   mean_elapsed = elapsed / real(N_runs, dp)
   elapsed_all(4) = mean_elapsed
-  call print_row(4, plot_labels(4), mean_elapsed, stats, y, plot_unit, plot_data_enabled)
+  call print_row(4, plot_labels(4), mean_elapsed, stats, plot_unit, plot_data_enabled)
 
 
   ! ----------------------------------------------------------------------------
@@ -165,7 +279,7 @@ program rk_benchmark
     elapsed = real(t2-t1, dp)/real(count_rate, dp)
     mean_elapsed = elapsed / real(N_runs, dp)
     elapsed_all(5) = mean_elapsed
-    call print_row(5, plot_labels(5), mean_elapsed, stats, y, plot_unit, plot_data_enabled)
+    call print_row(5, plot_labels(5), mean_elapsed, stats, plot_unit, plot_data_enabled)
   end block
 
   ! ----------------------------------------------------------------------------
@@ -181,11 +295,11 @@ program rk_benchmark
   elapsed = real(t2-t1, dp)/real(count_rate, dp)
   mean_elapsed = elapsed / real(N_runs, dp)
   elapsed_all(6) = mean_elapsed
-  call print_row(6, plot_labels(6), mean_elapsed, stats, y, plot_unit, plot_data_enabled)
+  call print_row(6, plot_labels(6), mean_elapsed, stats, plot_unit, plot_data_enabled)
 
   write(*,'(A)') repeat("-", 80)
   write(*,'(A)') "Notes: Mean(s) is the mean time for one integration over all runs."
-  write(*,'(A)') "       Steps and NFev are from the last run; Final Y is printed as a cross-check."
+  write(*,'(A)') "       Steps and NFev are from the last run."
   write(*,'(A)') "       RK23 uses 3 evals per step attempt."
 
   if (plot_data_enabled) then
@@ -238,6 +352,18 @@ program rk_benchmark
 
 contains
 
+  pure logical function is_consistent(y, y_ref, atol_v, rtol_v)
+    real(dp), intent(in) :: y(:), y_ref(:), atol_v, rtol_v
+    integer :: k
+    is_consistent = .true.
+    do k = 1, size(y)
+      if (abs(y(k) - y_ref(k)) > atol_v + rtol_v * abs(y_ref(k))) then
+        is_consistent = .false.
+        return
+      end if
+    end do
+  end function is_consistent
+
   subroutine rhs_internal(n, t_ev, y_ev, f)
     integer,  intent(in)  :: n
     real(dp), intent(in)  :: t_ev, y_ev(n)
@@ -247,12 +373,11 @@ contains
     f(3) =  3.0e7_dp * y_ev(2)**2
   end subroutine rhs_internal
 
-  subroutine print_row(id, label, mean_elapsed, s, y_fin, plot_unit_out, plot_data_enabled_out)
+  subroutine print_row(id, label, mean_elapsed, s, plot_unit_out, plot_data_enabled_out)
     integer,          intent(in) :: id
     character(len=*), intent(in) :: label
     real(dp),         intent(in) :: mean_elapsed
     type(rk_stats),   intent(in) :: s
-    real(dp),         intent(in) :: y_fin(neqn)
     integer,          intent(in), optional :: plot_unit_out
     logical,          intent(in), optional :: plot_data_enabled_out
 
@@ -272,7 +397,6 @@ contains
     write(*,'(I2,A2,A30,F10.4,I8,I8,I8,F12.4,F12.4)') &
       id, ". ", label, mean_elapsed, s%accepted, s%rejected, s%nfev, &
       us_per_step, us_per_nfev
-    write(*,'(A36,A,3ES12.4)') "", "Final Y:", y_fin
     if (present(plot_unit_out) .and. present(plot_data_enabled_out)) then
       if (plot_data_enabled_out) then
         write(plot_unit_out,'(I2,1X,F12.4,1X,A)') id, us_per_step, '"'//trim(label)//'"'
