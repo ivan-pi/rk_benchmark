@@ -36,11 +36,10 @@ See [EXTRA.md](EXTRA.md) for a detailed description of each strategy.
 ```
 rk_kinds.f90         – kind parameter (dp = c_double) and iso_c_binding imports
 rk_types.f90         – abstract interfaces and the ode_functor base type
-rk_solvers.f90       – Fortran solver variants (rk23_simple … rk23_class_star)
-rk_c_solver.f90      – explicit-interface wrapper for the optional external C rk23_cptr solver
+rk_solvers.f90       – solver variants plus the explicit-interface wrapper for the optional external C rk23_cptr solver
 rk23_cptr_external.c – optional C implementation of the rk23_cptr solver
 robertson_models.f90 – Robertson RHS implementations for each strategy
-rk_benchmark.f90     – driver: reports mean time per integration over N_runs loops
+rk_benchmark.F90     – driver: reports mean time per integration over N_runs loops
 scripts/             – helper scripts and reference implementations
 CMakeLists.txt       – build system
 ```

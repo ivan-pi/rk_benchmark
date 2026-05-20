@@ -1,13 +1,7 @@
 program rk_benchmark
   use rk_kinds
   use rk_types
-#ifdef USE_EXTERNAL_C_RK23
-  use rk_c_solver, only: rk23_cptr_iface => rk23_cptr_external
-#endif
-  use rk_solvers, only: rk23_simple, rk23_par, rk23_tb, rk23_rci, rk23_class_star, rk_stats
-#ifndef USE_EXTERNAL_C_RK23
-  use rk_solvers, only: rk23_cptr_iface => rk23_cptr
-#endif
+  use rk_solvers, only: rk23_simple, rk23_par, rk23_tb, rk23_rci, rk23_class_star, rk23_cptr, rk_stats
   use robertson_models
   use iso_fortran_env, only: error_unit
   implicit none
@@ -114,7 +108,7 @@ program rk_benchmark
   p_data = c_loc(c_data)
   work = 0.0_dp
   t = t_start; y = y_init; h = h_init
-  call rk23_cptr_iface(neqn, rob_cptr, t, y, t_end, h, atol, rtol, work, p_data, idid, stats)
+  call run_cptr_solver(t, y, h, idid, stats)
   if (idid == -1) write(error_unit,*) "warm-up 3: step-size underflow!"
   val_ok = is_close(y, y_ref, val_atol, val_rtol)
   if (.not. val_ok) n_fail = n_fail + 1
@@ -209,7 +203,7 @@ program rk_benchmark
   call system_clock(t1)
   do i = 1, N_runs
     t = t_start; y = y_init; h = h_init
-    call rk23_cptr_iface(neqn, rob_cptr, t, y, t_end, h, atol, rtol, work, p_data, idid, stats)
+    call run_cptr_solver(t, y, h, idid, stats)
     if (idid == -1) write(error_unit,*) "3. Step-size underflow!"
   end do
   call system_clock(t2)
@@ -362,6 +356,21 @@ contains
   ! Runs a single RK23 integration using the reverse communication interface.
   ! Encapsulates the state-machine loop so it can be called from both the
   ! validation pass and the benchmark pass without duplication.
+  subroutine run_cptr_solver(t, y, h, idid, stats)
+#ifdef USE_EXTERNAL_C_RK23
+    use rk_solvers, only: rk23_cptr_external
+#endif
+    real(dp), intent(inout) :: t, y(neqn), h
+    integer,  intent(out)   :: idid
+    type(rk_stats), intent(out) :: stats
+
+#ifdef USE_EXTERNAL_C_RK23
+    call rk23_cptr_external(neqn, rob_cptr, t, y, t_end, h, atol, rtol, work, p_data, idid, stats)
+#else
+    call rk23_cptr(neqn, rob_cptr, t, y, t_end, h, atol, rtol, work, p_data, idid, stats)
+#endif
+  end subroutine run_cptr_solver
+
   subroutine run_rci(t, y, h, idid, stats, err_label)
     real(dp),         intent(inout) :: t, y(neqn), h
     integer,          intent(out)   :: idid

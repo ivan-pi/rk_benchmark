@@ -1,3 +1,4 @@
+#include <stdbool.h>
 #include <math.h>
 
 typedef struct {
@@ -6,11 +7,13 @@ typedef struct {
   int nfev;
 } rk_stats;
 
-typedef void (*rk23_rhs_fn)(int neqn, double t, const double *y, double *ydot, const void *ctx);
+typedef void (*rk23_rhs_fn)(int neqn, double t, const double y[restrict static 1],
+                            double ydot[restrict static 1], const void *ctx);
 
-static double weighted_norm(const int n, const double *const y_old, const double *const y_next,
-                            const double *const err_vec, const double *const a_tol,
-                            const double r_tol) {
+static double weighted_norm(int n, const double y_old[restrict static 1],
+                            const double y_next[restrict static 1],
+                            const double err_vec[restrict static 1],
+                            const double a_tol[restrict static 1], double r_tol) {
   double sum_sq = 0.0;
 
   for (int i = 0; i < n; ++i) {
@@ -22,11 +25,14 @@ static double weighted_norm(const int n, const double *const y_old, const double
   return sqrt(sum_sq / (double)n);
 }
 
-static void rk23_step(const int n, const rk23_rhs_fn fun, const double t_cur, const double dt,
-                      const double *const y_cur, const double *const k1, double *const k2,
-                      double *const k3, double *const k4, double *const tmp,
-                      const double *const a_tol, const double r_tol, const void *const ctx,
-                      double *const y_next, double *const err_val) {
+static void rk23_step(int n, rk23_rhs_fn fun, double t_cur, double dt,
+                      const double y_cur[restrict static 1],
+                      const double k1[restrict static 1], double k2[restrict static 1],
+                      double k3[restrict static 1], double k4[restrict static 1],
+                      double tmp[restrict static 1],
+                      const double a_tol[restrict static 1], double r_tol,
+                      const void *ctx, double y_next[restrict static 1],
+                      double *err_val) {
   for (int i = 0; i < n; ++i) {
     tmp[i] = y_cur[i] + dt * 0.5 * k1[i];
   }
@@ -49,63 +55,69 @@ static void rk23_step(const int n, const rk23_rhs_fn fun, const double t_cur, co
   *err_val = weighted_norm(n, y_cur, y_next, tmp, a_tol, r_tol);
 }
 
-void rk23_cptr_external(const int *const neqn, const rk23_rhs_fn fun, double *const t, double *const y,
-                        const double *const tend, double *const h, const double *const atol,
-                        const double *const rtol, double *const work, const void *const ctx,
-                        int *const idid, rk_stats *const stats) {
-  const int n = *neqn;
+void rk23_cptr_external(int neqn, rk23_rhs_fn fun, double *t,
+                        double y[restrict static 1], double tend, double *h,
+                        const double atol[restrict static 1], double rtol,
+                        double work[restrict static 1], const void *ctx, int *idid,
+                        rk_stats *stats) {
+  int n = neqn;
+  double t_cur = *t;
+  double h_cur = *h;
+  int idid_cur = 0;
+  rk_stats stats_cur = (rk_stats){};
   double y_new[n];
   double err;
   double fac;
-  double *const k1 = work;
-  double *const k2 = work + n;
-  double *const k3 = work + 2 * n;
-  double *const k4 = work + 3 * n;
-  double *const tmp = work + 4 * n;
+  double *restrict k1 = &work[0 * n];
+  double *restrict k2 = &work[1 * n];
+  double *restrict k3 = &work[2 * n];
+  double *restrict k4 = &work[3 * n];
+  double *restrict tmp = &work[4 * n];
 
-  *idid = 0;
-  stats->accepted = 0;
-  stats->rejected = 0;
-  stats->nfev = 0;
+  fun(n, t_cur, y, k1, ctx);
+  stats_cur.nfev += 1;
 
-  fun(n, *t, y, k1, ctx);
-  stats->nfev += 1;
-
-  while (*t < *tend) {
-    if (*t + *h > *tend) {
-      *h = *tend - *t;
+  while (t_cur < tend) {
+    if (t_cur + h_cur > tend) {
+      h_cur = tend - t_cur;
     }
 
-    int step_rejected = 0;
+    bool step_rejected = false;
 
-    for (;;) {
-      if (*h <= fabs(nextafter(*t, INFINITY) - *t)) {
-        *idid = -1;
-        return;
+    do {
+      if (h_cur <= fabs(nextafter(t_cur, INFINITY) - t_cur)) {
+        idid_cur = -1;
+        goto finish;
       }
 
-      rk23_step(n, fun, *t, *h, y, k1, k2, k3, k4, tmp, atol, *rtol, ctx, y_new, &err);
-      stats->nfev += 3;
-      fac = 0.9 * pow(1.0 / fmax(err, 1.0e-10), 1.0 / 3.0);
+      rk23_step(n, fun, t_cur, h_cur, y, k1, k2, k3, k4, tmp, atol, rtol, ctx, y_new, &err);
+      stats_cur.nfev += 3;
+      fac = 0.9 * cbrt(1.0 / fmax(err, 1.0e-10));
 
       if (err < 1.0) {
         if (step_rejected) {
           fac = fmin(1.0, fac);
         }
 
-        *t += *h;
+        t_cur += h_cur;
         for (int i = 0; i < n; ++i) {
           y[i] = y_new[i];
           k1[i] = k4[i];
         }
-        *h *= fmax(0.2, fmin(5.0, fac));
-        stats->accepted += 1;
+        h_cur *= fmax(0.2, fmin(5.0, fac));
+        stats_cur.accepted += 1;
         break;
       }
 
-      *h *= fmax(0.2, fmin(5.0, fac));
-      step_rejected = 1;
-      stats->rejected += 1;
-    }
+      h_cur *= fmax(0.2, fmin(5.0, fac));
+      step_rejected = true;
+      stats_cur.rejected += 1;
+    } while (true);
   }
+
+finish:
+  *t = t_cur;
+  *h = h_cur;
+  *idid = idid_cur;
+  *stats = stats_cur;
 }

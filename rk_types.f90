@@ -28,11 +28,11 @@ module rk_types
 
     subroutine func_cptr(neqn, t, y, ydot, ctx) bind(c)
       import :: c_double, c_int, c_ptr
-      integer(c_int), value, intent(in) :: neqn
-      real(c_double), value, intent(in) :: t
-      real(c_double), intent(in)  :: y(neqn)
-      real(c_double), intent(out) :: ydot(neqn)
-      type(c_ptr), value, intent(in) :: ctx
+      integer(c_int), value :: neqn
+      real(c_double), value :: t
+      real(c_double), intent(in)  :: y(*)
+      real(c_double), intent(out) :: ydot(*)
+      type(c_ptr), value :: ctx
     end subroutine func_cptr
 
     subroutine func_class_star(neqn, t, y, ydot, ctx)

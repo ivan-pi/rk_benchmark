@@ -5,12 +5,30 @@
 module rk_solvers
   use rk_kinds, only: dp
   use rk_types
+  use iso_c_binding, only: c_double, c_funloc, c_funptr, c_int, c_ptr
   implicit none
   private
 
-  public :: rk23_simple, rk23_par, rk23_cptr, rk23_tb
+  public :: rk23_simple, rk23_par, rk23_cptr, rk23_cptr_external, rk23_tb
   public :: rk23_rci, rk23_class_star
   public :: rk_stats
+
+  interface
+    subroutine rk23_cptr_external_impl(neqn, fun, t, y, tend, h, atol, rtol, work, ctx, idid, stats) &
+        bind(c, name="rk23_cptr_external")
+      import :: c_double, c_funptr, c_int, c_ptr, rk_stats
+      integer(c_int), value        :: neqn
+      type(c_funptr), value        :: fun
+      real(c_double), intent(inout) :: t, h
+      real(c_double), intent(inout) :: y(*)
+      real(c_double), value        :: tend, rtol
+      real(c_double), intent(in)   :: atol(*)
+      real(c_double), intent(inout) :: work(*)
+      type(c_ptr), value           :: ctx
+      integer(c_int), intent(out)  :: idid
+      type(rk_stats), intent(out)  :: stats
+    end subroutine rk23_cptr_external_impl
+  end interface
 
 contains
 
@@ -200,12 +218,14 @@ contains
     integer,  intent(out)   :: idid
     type(rk_stats), intent(out) :: stats
 
+    integer(c_int) :: neqn_c
     real(dp) :: err, fac, y_new(neqn)
     logical  :: step_rejected
 
+    neqn_c = neqn
     idid = 0
     stats = rk_stats()
-    call fun(neqn, t, y, work(:,1), ctx)
+    call fun(neqn_c, t, y, work(:,1), ctx)
     stats%nfev = stats%nfev + 1
 
     integrate: do while (t < tend)
@@ -246,14 +266,17 @@ contains
       type(c_ptr), value    :: cctx
       real(dp), intent(out) :: k2(n), k3(n), k4(n), tmp(n), y_next(n), err_val
 
+      integer(c_int) :: n_c
+
+      n_c = n
       tmp = y_cur + dt * 0.5_dp * k1
-      call fn(n, t_cur + 0.5_dp*dt, tmp, k2, cctx)
+      call fn(n_c, t_cur + 0.5_dp*dt, tmp, k2, cctx)
 
       tmp = y_cur + dt * 0.75_dp * k2
-      call fn(n, t_cur + 0.75_dp*dt, tmp, k3, cctx)
+      call fn(n_c, t_cur + 0.75_dp*dt, tmp, k3, cctx)
 
       y_next = y_cur + dt * ((2.0_dp/9.0_dp)*k1 + (1.0_dp/3.0_dp)*k2 + (4.0_dp/9.0_dp)*k3)
-      call fn(n, t_cur + dt, y_next, k4, cctx)
+      call fn(n_c, t_cur + dt, y_next, k4, cctx)
 
       tmp = dt * (-5.0_dp/72.0_dp * k1 + 1.0_dp/12.0_dp * k2 + &
                    1.0_dp/9.0_dp * k3 - 1.0_dp/8.0_dp * k4)
@@ -261,6 +284,24 @@ contains
     end subroutine rk23_step
 
   end subroutine rk23_cptr
+
+
+  subroutine rk23_cptr_external(neqn, fun, t, y, tend, h, atol, rtol, work, ctx, idid, stats)
+    integer, intent(in) :: neqn
+    procedure(func_cptr) :: fun
+    real(dp), intent(inout) :: t, y(neqn), h
+    real(dp), intent(in)    :: tend, atol(neqn), rtol
+    real(dp), intent(inout) :: work(neqn, 5)
+    type(c_ptr), value      :: ctx
+    integer,  intent(out)   :: idid
+    type(rk_stats), intent(out) :: stats
+
+    integer(c_int) :: neqn_c, idid_c
+
+    neqn_c = neqn
+    call rk23_cptr_external_impl(neqn_c, c_funloc(fun), t, y, tend, h, atol, rtol, work, ctx, idid_c, stats)
+    idid = idid_c
+  end subroutine rk23_cptr_external
 
 
   ! ============================================================================
