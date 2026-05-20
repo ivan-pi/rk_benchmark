@@ -55,7 +55,7 @@ cmake --build build -j
 ./build/rk_benchmark [N_runs]
 ```
 
-To produce a bar-chart PNG of mean time per step:
+To produce a horizontal bar-chart PNG of mean time per step with gnuplot:
 
 ```bash
 gnuplot scripts/plot_mean_time_per_step.gp
