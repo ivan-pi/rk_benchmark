@@ -45,6 +45,7 @@ contains
     type(rk_stats), intent(out) :: stats
 
     real(dp) :: err, fac, y_new(neqn)
+    logical  :: step_rejected
 
     idid = 0
     stats = rk_stats()
@@ -54,6 +55,7 @@ contains
 
     integrate: do while (t < tend)
       if (t + h > tend) h = tend - t
+      step_rejected = .false.
 
       attempt: do
         if (h <= spacing(t)) then
@@ -65,7 +67,8 @@ contains
         stats%nfev = stats%nfev + 3
         fac = 0.9_dp * (1.0_dp / max(err, 1.0e-10_dp))**(1.0_dp/3.0_dp)
 
-        if (err <= 1.0_dp) then
+        if (err < 1.0_dp) then
+          if (step_rejected) fac = min(1.0_dp, fac)
           t = t + h
           y = y_new
           work(:,1) = work(:,4) ! FSAL: k4 of accepted step becomes k1 of next
@@ -76,6 +79,7 @@ contains
 
         ! Rejected: t and y are unchanged, so work(:,1) is still the valid k1
         h = h * max(0.2_dp, min(5.0_dp, fac))
+        step_rejected = .true.
         stats%rejected = stats%rejected + 1
       end do attempt
     end do integrate
@@ -119,6 +123,7 @@ contains
     type(rk_stats), intent(out) :: stats
 
     real(dp) :: err, fac, y_new(neqn)
+    logical  :: step_rejected
 
     idid = 0
     stats = rk_stats()
@@ -127,6 +132,7 @@ contains
 
     integrate: do while (t < tend)
       if (t + h > tend) h = tend - t
+      step_rejected = .false.
 
       attempt: do
         if (h <= spacing(t)) then
@@ -139,7 +145,8 @@ contains
         stats%nfev = stats%nfev + 3
         fac = 0.9_dp * (1.0_dp / max(err, 1.0e-10_dp))**(1.0_dp/3.0_dp)
 
-        if (err <= 1.0_dp) then
+        if (err < 1.0_dp) then
+          if (step_rejected) fac = min(1.0_dp, fac)
           t = t + h
           y = y_new
           work(:,1) = work(:,4)
@@ -149,6 +156,7 @@ contains
         end if
 
         h = h * max(0.2_dp, min(5.0_dp, fac))
+        step_rejected = .true.
         stats%rejected = stats%rejected + 1
       end do attempt
     end do integrate
@@ -193,6 +201,7 @@ contains
     type(rk_stats), intent(out) :: stats
 
     real(dp) :: err, fac, y_new(neqn)
+    logical  :: step_rejected
 
     idid = 0
     stats = rk_stats()
@@ -201,6 +210,7 @@ contains
 
     integrate: do while (t < tend)
       if (t + h > tend) h = tend - t
+      step_rejected = .false.
 
       attempt: do
         if (h <= spacing(t)) then
@@ -212,7 +222,8 @@ contains
         stats%nfev = stats%nfev + 3
         fac = 0.9_dp * (1.0_dp / max(err, 1.0e-10_dp))**(1.0_dp/3.0_dp)
 
-        if (err <= 1.0_dp) then
+        if (err < 1.0_dp) then
+          if (step_rejected) fac = min(1.0_dp, fac)
           t = t + h
           y = y_new
           work(:,1) = work(:,4)
@@ -222,6 +233,7 @@ contains
         end if
 
         h = h * max(0.2_dp, min(5.0_dp, fac))
+        step_rejected = .true.
         stats%rejected = stats%rejected + 1
       end do attempt
     end do integrate
@@ -264,6 +276,7 @@ contains
     type(rk_stats), intent(out) :: stats
 
     real(dp) :: err, fac, y_new(neqn)
+    logical  :: step_rejected
 
     idid = 0
     stats = rk_stats()
@@ -272,6 +285,7 @@ contains
 
     integrate: do while (t < tend)
       if (t + h > tend) h = tend - t
+      step_rejected = .false.
 
       attempt: do
         if (h <= spacing(t)) then
@@ -283,7 +297,8 @@ contains
         stats%nfev = stats%nfev + 3
         fac = 0.9_dp * (1.0_dp / max(err, 1.0e-10_dp))**(1.0_dp/3.0_dp)
 
-        if (err <= 1.0_dp) then
+        if (err < 1.0_dp) then
+          if (step_rejected) fac = min(1.0_dp, fac)
           t = t + h
           y = y_new
           work(:,1) = work(:,4)
@@ -293,6 +308,7 @@ contains
         end if
 
         h = h * max(0.2_dp, min(5.0_dp, fac))
+        step_rejected = .true.
         stats%rejected = stats%rejected + 1
       end do attempt
     end do integrate
@@ -326,7 +342,7 @@ contains
   ! Caller passes k1 into work(:,1) before entering the loop.
   ! ============================================================================
   subroutine rk23_rci(stage, neqn, t, y, tend, h, atol, rtol, work, &
-                      t_eval, y_eval, idid, stats)
+                      t_eval, y_eval, idid, stats, step_rejected)
     integer,  intent(inout) :: stage
     integer,  intent(in)    :: neqn
     real(dp), intent(inout) :: t, y(neqn), h
@@ -335,6 +351,7 @@ contains
     real(dp), intent(out)   :: t_eval, y_eval(neqn)
     integer,  intent(out)   :: idid
     type(rk_stats), intent(inout) :: stats
+    logical,  intent(inout) :: step_rejected
 
     real(dp) :: err, fac, err_vec(neqn)
 
@@ -365,12 +382,15 @@ contains
         fac = 0.9_dp * (1.0_dp / max(err, 1.0e-10_dp))**(1.0_dp/3.0_dp)
 
         stats%nfev = stats%nfev + 3
-        if (err <= 1.0_dp) then
+        if (err < 1.0_dp) then
+          if (step_rejected) fac = min(1.0_dp, fac)
           t = t + h
           y = work(:,5)
           work(:,1) = work(:,4) ! FSAL: k4 becomes k1
+          step_rejected = .false. ! reset for the next step
           stats%accepted = stats%accepted + 1
         else
+          step_rejected = .true.
           stats%rejected = stats%rejected + 1
         end if
 
@@ -398,6 +418,7 @@ contains
     type(rk_stats), intent(out) :: stats
 
     real(dp) :: err, fac, y_new(neqn)
+    logical  :: step_rejected
 
     idid = 0
     stats = rk_stats()
@@ -406,6 +427,7 @@ contains
 
     integrate: do while (t < tend)
       if (t + h > tend) h = tend - t
+      step_rejected = .false.
 
       attempt: do
         if (h <= spacing(t)) then
@@ -417,7 +439,8 @@ contains
         stats%nfev = stats%nfev + 3
         fac = 0.9_dp * (1.0_dp / max(err, 1.0e-10_dp))**(1.0_dp/3.0_dp)
 
-        if (err <= 1.0_dp) then
+        if (err < 1.0_dp) then
+          if (step_rejected) fac = min(1.0_dp, fac)
           t = t + h
           y = y_new
           work(:,1) = work(:,4)
@@ -427,6 +450,7 @@ contains
         end if
 
         h = h * max(0.2_dp, min(5.0_dp, fac))
+        step_rejected = .true.
         stats%rejected = stats%rejected + 1
       end do attempt
     end do integrate
