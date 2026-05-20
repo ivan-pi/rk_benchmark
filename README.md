@@ -65,13 +65,15 @@ gnuplot scripts/plot_mean_time_per_step.gp
 ## Interpreting results
 
 ```
-    Interface                       Mean(s)   Steps     Rej    NFev     us/step
- 1. F77 Ext. (implicit iface)        0.0048      80      59     418     60.3
- 2. Callback with RPAR/IPAR          0.0048      80      59     418     60.4
- 3. Callback C-Style (ctx)           0.0049      80      59     418     61.3
- 4. Functor Method (OOP)             0.0050      80      59     418     62.4
- 5. Reverse Communication            0.0048      80      59     418     60.0
- 6. Class(*) Select Type             0.0051      80      59     418     63.8
+                         Interface   Mean(s)   Steps     Rej    NFev     us/step
+--------------------------------------------------------------------------------
+ 1. F77 Ext. (implicit iface)         0.0126  137206       8  411643      0.0916
+ 2. Callback with RPAR/IPAR           0.0127  137206       8  411643      0.0923
+ 3. Callback C-Style (ctx)            0.0126  137206       8  411643      0.0915
+ 4. Functor Method (OOP)              0.0127  137206       8  411643      0.0923
+ 5. Reverse Communication             0.0147  137206       8  411643      0.1071
+ 6. Class(*) Select Type              0.0125  137206       8  411643      0.0908
+--------------------------------------------------------------------------------
 ```
 
 * **Mean(s)** — wall time for 100 integrations.
