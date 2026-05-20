@@ -52,7 +52,7 @@ git clone https://github.com/ivan-pi/rk_benchmark.git
 cd rk_benchmark
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j
-./build/rk_benchmark
+./build/rk_benchmark [N_runs]
 ```
 
 To produce a bar-chart PNG of mean time per step:
@@ -65,20 +65,20 @@ gnuplot scripts/plot_mean_time_per_step.gp
 ## Interpreting results
 
 ```
-    Interface                       Mean(s)   Steps     Rej    NFev     us/step     us/NFev
- 1. F77 Ext. (implicit iface)        0.0048      80      59     418     60.3        11.6
- 2. Callback with RPAR/IPAR          0.0048      80      59     418     60.4        11.6
- 3. Callback C-Style (ctx)           0.0049      80      59     418     61.3        11.7
- 4. Functor Method (OOP)             0.0050      80      59     418     62.4        12.0
- 5. Reverse Communication            0.0048      80      59     418     60.0        11.5
- 6. Class(*) Select Type             0.0051      80      59     418     63.8        12.2
+    Interface                       Mean(s)   Steps     Rej    NFev     us/step
+ 1. F77 Ext. (implicit iface)        0.0048      80      59     418     60.3
+ 2. Callback with RPAR/IPAR          0.0048      80      59     418     60.4
+ 3. Callback C-Style (ctx)           0.0049      80      59     418     61.3
+ 4. Functor Method (OOP)             0.0050      80      59     418     62.4
+ 5. Reverse Communication            0.0048      80      59     418     60.0
+ 6. Class(*) Select Type             0.0051      80      59     418     63.8
 ```
 
 * **Mean(s)** — wall time for 100 integrations.
 * **Steps / Rej** — accepted and rejected steps (identical across strategies;
   a mismatch would indicate a bug).
 * **NFev** — right-hand-side evaluations.
-* **us/step** and **us/NFev** — the primary comparison metrics; lower is faster.
+* **us/step** — the primary comparison metric; lower is faster.
 
 For a non-chaotic problem like Robertson kinetics all strategies should produce
 identical `Final Y` values (up to floating-point rounding).  Differences

@@ -6,7 +6,8 @@ program rk_benchmark
   use iso_fortran_env, only: error_unit
   implicit none
 
-  integer,  parameter :: neqn = 3, N_runs = 100
+  integer,  parameter :: neqn = 3
+  integer             :: N_runs
   real(dp), parameter :: y_init(neqn) = [1.0_dp, 0.0_dp, 0.0_dp]
   real(dp), parameter :: t_start = 0.0_dp, t_end = 100.0_dp
   real(dp), parameter :: atol(neqn) = 1.0e-8_dp, rtol = 1.0e-8_dp
@@ -36,6 +37,8 @@ program rk_benchmark
   real(dp)   :: elapsed_all(6)   ! store mean elapsed time per integration
   integer    :: plot_unit, io_stat
   logical    :: plot_data_enabled
+  character(len=20) :: cli_arg
+  integer    :: cli_stat
   real(dp)   :: y_ref(neqn)        ! reference final state from strategy 1 (warm-up)
   logical    :: val_ok              ! per-strategy consistency check result
   integer    :: n_fail              ! count of failed consistency checks
@@ -43,6 +46,16 @@ program rk_benchmark
   real(dp), parameter :: val_atol = 1.0e-6_dp, val_rtol = 1.0e-6_dp
 
   work = 0.0_dp
+
+  N_runs = 100
+  if (command_argument_count() >= 1) then
+    call get_command_argument(1, cli_arg)
+    read(cli_arg, *, iostat=cli_stat) N_runs
+    if (cli_stat /= 0 .or. N_runs < 1) then
+      write(error_unit,'(A)') "Usage: rk_benchmark [N_runs]"
+      error stop 1
+    end if
+  end if
 
   call system_clock(count_rate=count_rate)
 
@@ -142,8 +155,8 @@ program rk_benchmark
   write(*,'(A)') ""
   write(*,'(A)') "Benchmark Pass"
   write(*,'(A)') repeat("-", 80)
-  write(*,'(A4,A30,A10,A8,A8,A8,A12,A12)') &
-    "", "Interface", "Mean(s)", "Steps", "Rej", "NFev", "us/step", "us/NFev"
+  write(*,'(A4,A30,A10,A8,A8,A8,A12)') &
+    "", "Interface", "Mean(s)", "Steps", "Rej", "NFev", "us/step"
   write(*,'(A)') repeat("-", 80)
 
   ! ----------------------------------------------------------------------------
@@ -248,7 +261,6 @@ program rk_benchmark
   write(*,'(A)') "Notes: Mean(s) is the mean time for one integration over all runs."
   write(*,'(A)') "       Steps and NFev are from the last run."
   write(*,'(A)') "       RK23 uses 3 evals per step attempt."
-
   if (plot_data_enabled) then
     close(plot_unit)
     write(*,'(A,A)') "Wrote machine-readable plot data: ", trim(plot_data_file)
@@ -322,22 +334,17 @@ contains
     integer,          intent(in), optional :: plot_unit_out
     logical,          intent(in), optional :: plot_data_enabled_out
 
-    real(dp) :: us_per_step, us_per_nfev
+    real(dp) :: us_per_step
 
     if (s%accepted > 0) then
       us_per_step = mean_elapsed * 1.0e6_dp / real(s%accepted, dp)
     else
       us_per_step = 0.0_dp
     end if
-    if (s%nfev > 0) then
-      us_per_nfev = mean_elapsed * 1.0e6_dp / real(s%nfev, dp)
-    else
-      us_per_nfev = 0.0_dp
-    end if
 
-    write(*,'(I2,A2,A30,F10.4,I8,I8,I8,F12.4,F12.4)') &
+    write(*,'(I2,A2,A30,F10.4,I8,I8,I8,F12.4)') &
       id, ". ", label, mean_elapsed, s%accepted, s%rejected, s%nfev, &
-      us_per_step, us_per_nfev
+      us_per_step
     if (present(plot_unit_out) .and. present(plot_data_enabled_out)) then
       if (plot_data_enabled_out) then
         write(plot_unit_out,'(I2,1X,F12.4,1X,A)') id, us_per_step, '"'//trim(label)//'"'
