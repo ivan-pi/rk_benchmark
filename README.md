@@ -55,11 +55,18 @@ cmake --build build -j
 ./build/rk_benchmark [N_runs]
 ```
 
-To produce a bar-chart PNG of mean time per step:
+To produce a horizontal bar-chart PNG of mean time per step with gnuplot:
 
 ```bash
 gnuplot scripts/plot_mean_time_per_step.gp
 # output: scripts/mean_time_per_step.png
+```
+
+To produce the same horizontal bar-chart with Python/matplotlib:
+
+```bash
+python3 scripts/plot_mean_time_per_step.py
+# output: scripts/mean_time_per_step_py.png
 ```
 
 ## Interpreting results
