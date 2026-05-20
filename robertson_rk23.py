@@ -13,6 +13,7 @@ Robertson system:
 """
 
 import numpy as np
+from time import perf_counter
 from scipy.integrate import solve_ivp
 
 
@@ -30,13 +31,17 @@ t_span = (0.0, 100.0)
 atol = 1.0e-8
 rtol = 1.0e-8
 
+start = perf_counter()
 sol = solve_ivp(robertson, t_span, y0, method="RK23", atol=atol, rtol=rtol,
                 dense_output=False)
+elapsed = perf_counter() - start
 
 print("SciPy solve_ivp  (method='RK23')  —  Robertson problem  [0, 100]")
 print(f"  atol = {atol:.0e},  rtol = {rtol:.0e}")
 print()
 print(sol)
+print()
+print(f"Elapsed solve time: {elapsed:.6f} s")
 print()
 print(f"Final solution at t = {sol.t[-1]:.1f}:")
 for i, yi in enumerate(sol.y[:, -1]):
