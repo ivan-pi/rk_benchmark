@@ -7,8 +7,7 @@ strategies** inside an adaptive Runge-Kutta ODE solver.
 
 Quantify the dispatch overhead of six common Fortran callback idioms.  The
 test problem (Robertson chemical kinetics, 3 equations) is intentionally cheap
-so that callback overhead is the dominant cost.  Each strategy is timed over
-100 complete integrations.
+so that callback overhead is the dominant cost.
 
 ## Tested strategies
 
@@ -31,6 +30,18 @@ See [EXTRA.md](EXTRA.md) for a detailed description of each strategy.
   setup costs may look worse than they would on larger problems.
 * Strategy 1 (internal procedure / trampoline) may trigger executable-stack
   restrictions on some systems.
+
+## Repository layout
+
+```
+rk_kinds.f90         – kind parameter (dp = c_double) and iso_c_binding imports
+rk_types.f90         – abstract interfaces and the ode_functor base type
+rk_solvers.f90       – six solver variants (rk23_simple … rk23_class_star)
+robertson_models.f90 – Robertson RHS implementations for each strategy
+rk_benchmark.f90     – driver: reports mean time per integration over N_runs loops
+scripts/             – helper scripts and reference implementations
+CMakeLists.txt       – build system
+```
 
 ## Building and running
 
