@@ -14,6 +14,7 @@ program rk_benchmark
   real(dp) :: y(neqn), t, h
   real(dp), target :: work(neqn, 5)
   integer :: idid, i
+  type(rk_stats) :: stats
 
   ! Callback specifics
   real(dp) :: rpar(3)
@@ -23,6 +24,7 @@ program rk_benchmark
   type(c_ptr) :: p_data
   type(robertson_functor) :: sys
   integer(8) :: t1, t2, count_rate
+  real(dp)   :: elapsed
 
   work = 0.0_dp
 
@@ -30,7 +32,10 @@ program rk_benchmark
 
   write(*,'(A)') "RK23 Final Refactored Benchmark (Clean FSAL Property)"
   write(*,'(A,I0)') "Integrations per test: ", N_runs
-  write(*,'(A)') "--------------------------------------------------------------------------------"
+  write(*,'(A)') repeat("-", 80)
+  write(*,'(A4,A30,A10,A8,A8,A8,A12,A12)') &
+    "", "Interface", "Time(s)", "Steps", "Rej", "NFev", "us/step", "us/NFev"
+  write(*,'(A)') repeat("-", 80)
 
   ! ----------------------------------------------------------------------------
   ! 1. Internal Procedure (Capturing host data)
@@ -38,12 +43,12 @@ program rk_benchmark
   call system_clock(t1)
   do i = 1, N_runs
     t = t_start; y = y_init; h = 1.0e-3_dp
-    call rk23_simple(neqn, rhs_internal, t, y, t_end, h, atol, rtol, work, idid)
+    call rk23_simple(neqn, rhs_internal, t, y, t_end, h, atol, rtol, work, idid, stats)
     if (idid == -1) write(error_unit,*) "1. Step-size underflow!"
   end do
   call system_clock(t2)
-  print '(A, F10.4, A, 3F12.4)', "1. Internal Proc (Host-Data): ", &
-        real(t2-t1, dp)/real(count_rate, dp), " s | Final Y:", y
+  elapsed = real(t2-t1, dp)/real(count_rate, dp)
+  call print_row(1, "Internal Proc (Host-Data)", elapsed, N_runs, stats, y)
 
 
   ! ----------------------------------------------------------------------------
@@ -53,12 +58,12 @@ program rk_benchmark
   call system_clock(t1)
   do i = 1, N_runs
     t = t_start; y = y_init; h = 1.0e-3_dp
-    call rk23_par(neqn, rob_par, t, y, t_end, h, atol, rtol, work, rpar, ipar, idid)
+    call rk23_par(neqn, rob_par, t, y, t_end, h, atol, rtol, work, rpar, ipar, idid, stats)
     if (idid == -1) write(error_unit,*) "2. Step-size underflow!"
   end do
   call system_clock(t2)
-  print '(A, F10.4, A, 3F12.4)', "2. Callback with RPAR/IPAR:   ", &
-        real(t2-t1, dp)/real(count_rate, dp), " s | Final Y:", y
+  elapsed = real(t2-t1, dp)/real(count_rate, dp)
+  call print_row(2, "Callback with RPAR/IPAR", elapsed, N_runs, stats, y)
 
 
   ! ----------------------------------------------------------------------------
@@ -69,12 +74,12 @@ program rk_benchmark
   call system_clock(t1)
   do i = 1, N_runs
     t = t_start; y = y_init; h = 1.0e-3_dp
-    call rk23_cptr(neqn, rob_cptr, t, y, t_end, h, atol, rtol, work, p_data, idid)
+    call rk23_cptr(neqn, rob_cptr, t, y, t_end, h, atol, rtol, work, p_data, idid, stats)
     if (idid == -1) write(error_unit,*) "3. Step-size underflow!"
   end do
   call system_clock(t2)
-  print '(A, F10.4, A, 3F12.4)', "3. Callback C-Style (ctx):    ", &
-        real(t2-t1, dp)/real(count_rate, dp), " s | Final Y:", y
+  elapsed = real(t2-t1, dp)/real(count_rate, dp)
+  call print_row(3, "Callback C-Style (ctx)", elapsed, N_runs, stats, y)
 
 
   ! ----------------------------------------------------------------------------
@@ -83,19 +88,18 @@ program rk_benchmark
   call system_clock(t1)
   do i = 1, N_runs
     t = t_start; y = y_init; h = 1.0e-3_dp
-    call rk23_tb(neqn, sys, t, y, t_end, h, atol, rtol, work, idid)
+    call rk23_tb(neqn, sys, t, y, t_end, h, atol, rtol, work, idid, stats)
     if (idid == -1) write(error_unit,*) "4. Step-size underflow!"
   end do
   call system_clock(t2)
-  print '(A, F10.4, A, 3F12.4)', "4. Functor Method (OOP):      ", &
-        real(t2-t1, dp)/real(count_rate, dp), " s | Final Y:", y
+  elapsed = real(t2-t1, dp)/real(count_rate, dp)
+  call print_row(4, "Functor Method (OOP)", elapsed, N_runs, stats, y)
 
 
   ! ----------------------------------------------------------------------------
   ! 5. Full RCI State-Machine Loop
   ! ----------------------------------------------------------------------------
   block
-    ! RCI State Variables
     integer  :: stage
     real(dp) :: t_eval, y_eval(neqn)
 
@@ -104,18 +108,19 @@ program rk_benchmark
       t = t_start; y = y_init; h = 1.0e-3_dp
       work = 0.0_dp
       idid = 0
+      stats = rk_stats()
 
       ! Evaluate the initial k1 directly into column 1
       call rob_direct(neqn, t, y, work(:, 1))
+      stats%nfev = stats%nfev + 1
       stage = 1
 
       integrate: do
         call rk23_rci(stage, neqn, t, y, t_end, h, atol, rtol, work, &
-                      t_eval, y_eval, idid)
+                      t_eval, y_eval, idid, stats)
 
         select case(stage)
         case(2:4)
-          ! The stage requested perfectly maps to the workspace column
           call rob_direct(neqn, t_eval, y_eval, work(:, stage))
         case(6)
           if (idid == -1) write(error_unit, '(A)') "5. Step-size underflow!"
@@ -127,22 +132,26 @@ program rk_benchmark
       end do integrate
     end do
     call system_clock(t2)
-    print '(A, F10.4, A, 3F12.4)', "5. Reverse Communication:     ", &
-          real(t2-t1, dp)/real(count_rate, dp), " s | Final Y:", y
+    elapsed = real(t2-t1, dp)/real(count_rate, dp)
+    call print_row(5, "Reverse Communication", elapsed, N_runs, stats, y)
   end block
 
-! ----------------------------------------------------------------------------
+  ! ----------------------------------------------------------------------------
   ! 6. Class(*) / Unlimited Polymorphic Context
   ! ----------------------------------------------------------------------------
   call system_clock(t1)
   do i = 1, N_runs
     t = t_start; y = y_init; h = 1.0e-3_dp
-    call rk23_class_star(neqn, rob_class_star, t, y, t_end, h, atol, rtol, work, params, idid)
+    call rk23_class_star(neqn, rob_class_star, t, y, t_end, h, atol, rtol, work, params, idid, stats)
     if (idid == -1) write(error_unit,*) "6. Step-size underflow!"
   end do
   call system_clock(t2)
-  print '(A, F10.4, A, 3F12.4)', "6. Class(*) Select Type:      ", &
-        real(t2-t1, dp)/real(count_rate, dp), " s | Final Y:", y
+  elapsed = real(t2-t1, dp)/real(count_rate, dp)
+  call print_row(6, "Class(*) Select Type", elapsed, N_runs, stats, y)
+
+  write(*,'(A)') repeat("-", 80)
+  write(*,'(A)') "Notes: Steps = accepted steps (last run); us/step and us/NFev are means over all runs."
+  write(*,'(A)') "       NFev  = function evaluations (last run); RK23 uses 3 evals per step attempt."
 
 contains
 
@@ -154,5 +163,31 @@ contains
     f(2) =  0.04_dp * y_ev(1) - 1.0e4_dp * y_ev(2) * y_ev(3) - 3.0e7_dp * y_ev(2)**2
     f(3) =  3.0e7_dp * y_ev(2)**2
   end subroutine rhs_internal
+
+  subroutine print_row(id, label, elapsed, nruns, s, y_fin)
+    integer,          intent(in) :: id, nruns
+    character(len=*), intent(in) :: label
+    real(dp),         intent(in) :: elapsed
+    type(rk_stats),   intent(in) :: s
+    real(dp),         intent(in) :: y_fin(neqn)
+
+    real(dp) :: us_per_step, us_per_nfev
+
+    if (s%accepted > 0) then
+      us_per_step = elapsed * 1.0e6_dp / (real(nruns, dp) * real(s%accepted, dp))
+    else
+      us_per_step = 0.0_dp
+    end if
+    if (s%nfev > 0) then
+      us_per_nfev = elapsed * 1.0e6_dp / (real(nruns, dp) * real(s%nfev, dp))
+    else
+      us_per_nfev = 0.0_dp
+    end if
+
+    write(*,'(I2,A2,A30,F10.4,I8,I8,I8,F12.4,F12.4)') &
+      id, ". ", label, elapsed, s%accepted, s%rejected, s%nfev, &
+      us_per_step, us_per_nfev
+    write(*,'(A36,A,3ES12.4)') "", "Final Y:", y_fin
+  end subroutine print_row
 
 end program rk_benchmark
