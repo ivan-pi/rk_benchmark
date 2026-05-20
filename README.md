@@ -12,6 +12,8 @@ so that callback overhead is the dominant cost.  Each strategy is timed over
 
 ## Tested strategies
 
+See [EXTRA.md](EXTRA.md) for a detailed description of each strategy.
+
 | # | Name | Data passing | Dispatch |
 |---|------|-------------|----------|
 | 1 | Internal procedure (host association) | Implicit capture (trampoline) | Static |
@@ -29,8 +31,6 @@ so that callback overhead is the dominant cost.  Each strategy is timed over
   setup costs may look worse than they would on larger problems.
 * Strategy 1 (internal procedure / trampoline) may trigger executable-stack
   restrictions on some systems.
-* All workspace is pre-allocated by the caller; no heap allocation occurs
-  inside the timed loops.
 
 ## Building and running
 
@@ -69,5 +69,6 @@ gnuplot scripts/plot_mean_time_per_step.gp
 * **NFev** — right-hand-side evaluations.
 * **us/step** and **us/NFev** — the primary comparison metrics; lower is faster.
 
-All strategies should produce identical `Final Y` values.  Differences beyond
-floating-point rounding indicate an implementation error.
+For a non-chaotic problem like Robertson kinetics all strategies should produce
+identical `Final Y` values (up to floating-point rounding).  Differences
+indicate an implementation error.
