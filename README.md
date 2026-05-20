@@ -14,9 +14,8 @@ solution is the **strategy pattern**: the solver receives a callable object (a
 *strategy*) that it invokes on demand.
 
 The benchmark isolates the cost of the callback dispatch itself by using an
-intentionally cheap test problem — the 3-equation
-[Robertson chemical kinetics system](https://www.unige.ch/~hairer/testset/testset.html)
-— so that the integrator overhead represents the largest possible fraction of
+intentionally cheap test problem — the 3-equation Robertson chemical kinetics
+system — so that the integrator overhead represents the largest possible fraction of
 total runtime.  Six different strategies are timed over 100 complete
 integrations each.
 
@@ -49,8 +48,8 @@ history, and each carries different tradeoffs between:
 
 | # | Name | Data passing | Dispatch | Notes |
 |---|------|-------------|----------|-------|
-| 1 | Internal procedure (host association) | Implicit capture | Static / inlineable | Tightest coupling; data lives in the host scope |
-| 2 | Callback + `rpar`/`ipar` (SLATEC style) | Explicit arrays | Static | Legacy idiom; type-unsafe but widely portable |
+| 1 | Internal procedure (host association) | Implicit capture (trampoline) | Static | Tightest coupling; data lives in the host scope; trampoline may cause executable-stack issues |
+| 2 | Callback + `rpar`/`ipar` (SLATEC style) | Explicit arrays | Static | Legacy idiom; constrained to real/integer data; widely portable |
 | 3 | Callback + `c_ptr` (C-style opaque pointer) | Opaque pointer | Static (bind(C)) | C-interoperable; requires `c_f_pointer` cast in callback |
 | 4 | Type-bound procedure (OOP functor) | Object data members | Dynamic (vtable) | Data and behaviour in one derived type; extensible via inheritance |
 | 5 | Reverse communication interface (RCI) | Caller-managed | None (no callback) | Solver yields control; caller evaluates and re-enters; maximally flexible but verbose |
@@ -59,18 +58,23 @@ history, and each carries different tradeoffs between:
 #### Internal procedure (strategy 1)
 
 The right-hand side is defined as a `contains` subprogram of the calling scope
-and captures all needed data through *host association*.  The compiler sees the
-full call graph and may inline the function, making this potentially the
-fastest option.  The downside is tight coupling: the RHS cannot be defined in a
-separate module or shared library.
+and captures all needed data through *host association*.  However, the compiler
+cannot inline the call when the solver lives in a separate translation unit
+(compiled library).  In practice, compilers implement the host-data capture
+using a *trampoline* — a small, compiler-generated thunk stored on the stack —
+which can trigger executable-stack restrictions on some operating systems and
+older compiler versions.  The downside is tight coupling: the RHS cannot be
+defined in a separate module or shared library.
 
 #### RPAR / IPAR arrays (strategy 2)
 
 Inspired by SLATEC and early NAG/IMSL libraries, the solver passes two
 work arrays (`rpar(:)` for reals, `ipar(:)` for integers) through to the
 callback unchanged.  The user packs parameters into those arrays.  There is no
-dynamic dispatch and no allocation, but the interface is type-unsafe and
-cumbersome for complex data.
+dynamic dispatch and no allocation.  The interface is type-safe in the sense
+that the compiler enforces the array types, but it is constrained to real and
+integer data — passing anything else requires `transfer`, `equivalence`, or
+other type-system subversion mechanisms, making it cumbersome for complex data.
 
 #### C-style opaque pointer (strategy 3)
 
