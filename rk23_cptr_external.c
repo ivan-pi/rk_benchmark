@@ -7,13 +7,13 @@ typedef struct {
   int nfev;
 } rk_stats;
 
-typedef void (*rk23_rhs_fn)(int neqn, double t, const double y[restrict static 1],
-                            double ydot[restrict static 1], const void *ctx);
+typedef void (*rk23_rhs_fn)(int neqn, double t, const double y[restrict static neqn],
+                            double ydot[restrict static neqn], const void *ctx);
 
-static double weighted_norm(int n, const double y_old[restrict static 1],
-                            const double y_next[restrict static 1],
-                            const double err_vec[restrict static 1],
-                            const double a_tol[restrict static 1], double r_tol) {
+static double weighted_norm(int n, const double y_old[restrict static n],
+                            const double y_next[restrict static n],
+                            const double err_vec[restrict static n],
+                            const double a_tol[restrict static n], double r_tol) {
   double sum_sq = 0.0;
 
   for (int i = 0; i < n; ++i) {
@@ -26,12 +26,12 @@ static double weighted_norm(int n, const double y_old[restrict static 1],
 }
 
 static void rk23_step(int n, rk23_rhs_fn fun, double t_cur, double dt,
-                      const double y_cur[restrict static 1],
-                      const double k1[restrict static 1], double k2[restrict static 1],
-                      double k3[restrict static 1], double k4[restrict static 1],
-                      double tmp[restrict static 1],
-                      const double a_tol[restrict static 1], double r_tol,
-                      const void *ctx, double y_next[restrict static 1],
+                      const double y_cur[restrict static n],
+                      const double k1[restrict static n], double k2[restrict static n],
+                      double k3[restrict static n], double k4[restrict static n],
+                      double tmp[restrict static n],
+                      const double a_tol[restrict static n], double r_tol,
+                      const void *ctx, double y_next[restrict static n],
                       double *err_val) {
   for (int i = 0; i < n; ++i) {
     tmp[i] = y_cur[i] + dt * 0.5 * k1[i];
@@ -56,15 +56,13 @@ static void rk23_step(int n, rk23_rhs_fn fun, double t_cur, double dt,
 }
 
 void rk23_cptr_external(int neqn, rk23_rhs_fn fun, double *t,
-                        double y[restrict static 1], double tend, double *h,
-                        const double atol[restrict static 1], double rtol,
-                        double work[restrict static 1], const void *ctx, int *idid,
+                        double y[restrict static neqn], double tend, double *h,
+                        const double atol[restrict static neqn], double rtol,
+                        double work[restrict static 5 * neqn], const void *ctx, int *idid,
                         rk_stats *stats) {
   int n = neqn;
   double t_cur = *t;
   double h_cur = *h;
-  int idid_cur = 0;
-  rk_stats stats_cur = (rk_stats){};
   double y_new[n];
   double err;
   double fac;
@@ -74,8 +72,11 @@ void rk23_cptr_external(int neqn, rk23_rhs_fn fun, double *t,
   double *restrict k4 = &work[3 * n];
   double *restrict tmp = &work[4 * n];
 
+  *idid = 0;
+  *stats = (rk_stats){};
+
   fun(n, t_cur, y, k1, ctx);
-  stats_cur.nfev += 1;
+  stats->nfev += 1;
 
   while (t_cur < tend) {
     if (t_cur + h_cur > tend) {
@@ -86,12 +87,12 @@ void rk23_cptr_external(int neqn, rk23_rhs_fn fun, double *t,
 
     do {
       if (h_cur <= fabs(nextafter(t_cur, INFINITY) - t_cur)) {
-        idid_cur = -1;
+        *idid = -1;
         goto finish;
       }
 
       rk23_step(n, fun, t_cur, h_cur, y, k1, k2, k3, k4, tmp, atol, rtol, ctx, y_new, &err);
-      stats_cur.nfev += 3;
+      stats->nfev += 3;
       fac = 0.9 * cbrt(1.0 / fmax(err, 1.0e-10));
 
       if (err < 1.0) {
@@ -105,19 +106,17 @@ void rk23_cptr_external(int neqn, rk23_rhs_fn fun, double *t,
           k1[i] = k4[i];
         }
         h_cur *= fmax(0.2, fmin(5.0, fac));
-        stats_cur.accepted += 1;
+        stats->accepted += 1;
         break;
       }
 
       h_cur *= fmax(0.2, fmin(5.0, fac));
       step_rejected = true;
-      stats_cur.rejected += 1;
+      stats->rejected += 1;
     } while (true);
   }
 
 finish:
   *t = t_cur;
   *h = h_cur;
-  *idid = idid_cur;
-  *stats = stats_cur;
 }
