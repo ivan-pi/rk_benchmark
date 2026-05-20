@@ -17,7 +17,7 @@ program rk_benchmark
     "Functor Method (OOP)           ", &
     "Reverse Communication          ", &
     "Class(*) Select Type           "  ]
-  character(len=*), parameter :: plot_data_file = "mean_time_per_step.tsv"
+  character(len=*), parameter :: plot_data_file = "build/mean_time_per_step.tsv"
 
   real(dp) :: y(neqn), t, h
   real(dp), target :: work(neqn, 5)

@@ -14,4 +14,4 @@ set xtics rotate by -20 right
 set key off
 
 system "./build/rk_benchmark > /dev/null"
-plot "mean_time_per_step.tsv" using 2:xtic(1) title "us/step"
+plot "build/mean_time_per_step.tsv" using 2:xtic(1) title "us/step"
