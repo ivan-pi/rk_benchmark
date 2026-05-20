@@ -159,7 +159,9 @@ and CMake ≥ 3.30.
 ```bash
 git clone https://github.com/ivan-pi/rk_benchmark.git
 cd rk_benchmark
-cmake -B build -DCMAKE_Fortran_COMPILER=gfortran
+# Pick one explicitly: Release or RelWithDebug
+cmake -B build -DCMAKE_Fortran_COMPILER=gfortran -DCMAKE_BUILD_TYPE=Release
+# cmake -B build -DCMAKE_Fortran_COMPILER=gfortran -DCMAKE_BUILD_TYPE=RelWithDebInfo
 cmake --build build
 ./build/rk_benchmark
 ```

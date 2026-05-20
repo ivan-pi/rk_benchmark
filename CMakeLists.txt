@@ -20,3 +20,7 @@ if(ENABLE_LTO)
     message(WARNING "IPO is not supported: ${output}")
   endif()
 endif()
+
+message(STATUS "Current configuration: ${CMAKE_BUILD_TYPE}")
+message(STATUS "ENABLE_LTO: ${ENABLE_LTO}")
+message(STATUS "CMAKE_Fortran_FLAGS: ${CMAKE_Fortran_FLAGS}")
