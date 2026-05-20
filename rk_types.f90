@@ -3,10 +3,10 @@ module rk_types
   implicit none
 
   ! Statistics collected during a single integration
-  type :: rk_stats
-    integer :: accepted = 0   ! accepted steps
-    integer :: rejected = 0   ! rejected steps
-    integer :: nfev     = 0   ! function evaluations
+  type, bind(c) :: rk_stats
+    integer(c_int) :: accepted = 0   ! accepted steps
+    integer(c_int) :: rejected = 0   ! rejected steps
+    integer(c_int) :: nfev     = 0   ! function evaluations
   end type rk_stats
 
   abstract interface
@@ -27,11 +27,12 @@ module rk_types
     end subroutine func_par
 
     subroutine func_cptr(neqn, t, y, ydot, ctx) bind(c)
-      import :: dp, c_ptr
-      integer,  intent(in)  :: neqn
-      real(dp), intent(in)  :: t, y(neqn)
-      real(dp), intent(out) :: ydot(neqn)
-      type(c_ptr), value    :: ctx
+      import :: c_double, c_int, c_ptr
+      integer(c_int), value, intent(in) :: neqn
+      real(c_double), value, intent(in) :: t
+      real(c_double), intent(in)  :: y(neqn)
+      real(c_double), intent(out) :: ydot(neqn)
+      type(c_ptr), value, intent(in) :: ctx
     end subroutine func_cptr
 
     subroutine func_class_star(neqn, t, y, ydot, ctx)

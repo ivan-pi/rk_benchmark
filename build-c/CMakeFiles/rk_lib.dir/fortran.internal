@@ -1,0 +1,6 @@
+# The fortran modules provided by this target.
+provides
+ rk_c_solver.mod
+ rk_kinds.mod
+ rk_solvers.mod
+ rk_types.mod
