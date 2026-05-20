@@ -10,13 +10,13 @@ program euler_benchmark
   real(dp), parameter :: y_init(neqn) = [1.0_dp, 0.0_dp, 0.0_dp]
   real(dp), parameter :: t_start = 0.0_dp
   ! h_euler is chosen so the fixed-step count (N_steps) is well above 20 000;
-  ! at h=1e-7 and t_end=1e-2 we take 100 000 steps, comparable to the ~137 000
+  ! at h=5e-8 and t_end=1e-2 we take 200 000 steps, comparable to the ~137 000
   ! accepted steps the adaptive RK23 solver uses over [0, 100].
-  real(dp), parameter :: h_euler = 1.0e-7_dp
-  real(dp), parameter :: t_end   = 1.0e-2_dp   ! 100 000 steps at h=1e-7
+  real(dp), parameter :: h_euler = 5.0e-8_dp
+  real(dp), parameter :: t_end   = 1.0e-2_dp   ! 200 000 steps at h=5e-8
 
   character(len=30), parameter :: plot_labels(6) = [ &
-    "Direct Inline                  ", &
+    "Direct RHS (rob_direct)        ", &
     "F77 Ext. (implicit iface)      ", &
     "Callback with RPAR/IPAR        ", &
     "Callback C-Style (ctx)         ", &
@@ -48,7 +48,7 @@ program euler_benchmark
   character(len=8) :: vstatus
   real(dp), parameter :: val_atol = 1.0e-6_dp, val_rtol = 1.0e-6_dp
 
-  N_runs  = 100
+  N_runs  = 500
   N_steps = nint((t_end - t_start) / h_euler)
 
   if (command_argument_count() >= 1) then
@@ -78,7 +78,7 @@ program euler_benchmark
 
   write(*,'(A)') "Fixed-Step Forward Euler Benchmark (Minimal Solver Overhead)"
   write(*,'(A,I0)') "Integrations per test: ", N_runs
-  write(*,'(A,ES10.2)') "Euler step size h    : ", h_euler
+  write(*,'(A,G0.5)') "Euler step size h    : ", h_euler
   write(*,'(A,I0)')     "Steps per integration: ", N_steps
 
   ! ============================================================================
@@ -155,7 +155,7 @@ program euler_benchmark
   write(*,'(A4,A30,A10,A12)') "", "Interface", "Mean(s)", "us/step"
   write(*,'(A)') repeat("-", 80)
 
-  ! 1. Direct Inline (no callback overhead)
+  ! 1. Direct RHS call (no callback overhead)
   call system_clock(t1)
   do i = 1, N_runs
     t = t_start; y = y_init
@@ -236,7 +236,7 @@ program euler_benchmark
   end if
 
   ! ----------------------------------------------------------------------------
-  ! Callback overhead analysis vs. Direct Inline (strategy 1)
+  ! Callback overhead analysis vs. Direct RHS call (strategy 1)
   ! ----------------------------------------------------------------------------
   block
     real(dp) :: penalty(5), log_sum, geo_mean
@@ -250,7 +250,7 @@ program euler_benchmark
 
     write(*,'(A)') ""
     write(*,'(A)') repeat("-", 80)
-    write(*,'(A)') "Callback overhead vs. Direct Inline (Test 1, no callback):"
+    write(*,'(A)') "Callback overhead vs. Direct RHS call (Test 1, no callback):"
     write(*,'(A4,A30,A12)') "", "Interface", "Penalty"
     write(*,'(A)') repeat("-", 80)
 
@@ -266,9 +266,9 @@ program euler_benchmark
     write(*,'(A,F8.4)') &
       "Geometric mean penalty (callback overhead score): ", geo_mean
     write(*,'(A)') &
-      "  score > 1.0 : callbacks slower  (overhead relative to direct inline)"
+      "  score > 1.0 : callbacks slower  (overhead relative to direct RHS call)"
     write(*,'(A)') &
-      "  score < 1.0 : callbacks faster than direct inline"
+      "  score < 1.0 : callbacks faster than direct RHS call"
     write(*,'(A)') ""
     write(*,'(A)') "Note: scores may vary between runs due to runtime load, cache effects, etc."
     write(*,'(A)') "      Results must be interpreted with care."
@@ -281,16 +281,6 @@ contains
     is_close = all(abs(y - y_ref) <= atol_v + rtol_v * abs(y_ref))
   end function is_close
 
-  ! RHS callback passed as F77-style external (implicit interface)
-  subroutine rhs_internal(n, t_ev, y_ev, f)
-    integer,  intent(in)  :: n
-    real(dp), intent(in)  :: t_ev, y_ev(n)
-    real(dp), intent(out) :: f(n)
-    f(1) = -0.04_dp * y_ev(1) + 1.0e4_dp * y_ev(2) * y_ev(3)
-    f(2) =  0.04_dp * y_ev(1) - 1.0e4_dp * y_ev(2) * y_ev(3) - 3.0e7_dp * y_ev(2)**2
-    f(3) =  3.0e7_dp * y_ev(2)**2
-  end subroutine rhs_internal
-
   ! ─── Pseudo-integrators: one per callback style ──────────────────────────
   ! Each subroutine advances (t, y) by N_steps fixed Euler steps of size h_euler.
   ! They are called identically from both the validation pass and the benchmark
@@ -301,9 +291,7 @@ contains
     real(dp) :: dy(neqn)
     integer  :: rep
     do rep = 1, N_steps
-      dy(1) = -0.04_dp * y(1) + 1.0e4_dp * y(2) * y(3)
-      dy(2) =  0.04_dp * y(1) - 1.0e4_dp * y(2) * y(3) - 3.0e7_dp * y(2)**2
-      dy(3) =  3.0e7_dp * y(2)**2
+      call rob_direct(neqn, t, y, dy)
       y = y + h_euler * dy
       t = t + h_euler
     end do
@@ -314,7 +302,7 @@ contains
     real(dp) :: dy(neqn)
     integer  :: rep
     do rep = 1, N_steps
-      call rhs_internal(neqn, t, y, dy)
+      call rob_direct(neqn, t, y, dy)
       y = y + h_euler * dy
       t = t + h_euler
     end do
@@ -380,10 +368,10 @@ contains
       us_per_step = 0.0_dp
     end if
 
-    write(*,'(I2,A2,A30,F10.4,F12.4)') id, ". ", label, mean_elapsed, us_per_step
+    write(*,'(I2,A2,A30,1X,G12.5,1X,G12.5)') id, ". ", label, mean_elapsed, us_per_step
     if (present(plot_unit_out) .and. present(plot_data_enabled_out)) then
       if (plot_data_enabled_out) then
-        write(plot_unit_out,'(I2,1X,F12.4,1X,A)') id, us_per_step, '"'//trim(label)//'"'
+        write(plot_unit_out,'(I2,1X,G0.12,1X,A)') id, us_per_step, '"'//trim(label)//'"'
       end if
     end if
   end subroutine print_row
