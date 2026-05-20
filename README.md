@@ -174,9 +174,9 @@ From the repository root, run:
 gnuplot scripts/plot_mean_time_per_step.gp
 ```
 
-This runs `./build/rk_benchmark`, pipes the benchmark table through
-`scripts/extract_mean_time_per_step.awk`, and writes a bar chart to
-`scripts/mean_time_per_step.png`.
+This runs `./build/rk_benchmark` and writes two artifacts:
+- `build/mean_time_per_step.dat` (machine-readable data with `<id> <us/step> "<label>"`)
+- `scripts/mean_time_per_step.png` (bar chart)
 
 Example output (timings will vary by machine):
 

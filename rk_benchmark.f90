@@ -10,6 +10,14 @@ program rk_benchmark
   real(dp), parameter :: y_init(neqn) = [1.0_dp, 0.0_dp, 0.0_dp]
   real(dp), parameter :: t_start = 0.0_dp, t_end = 100.0_dp
   real(dp), parameter :: atol(neqn) = 1.0e-8_dp, rtol = 1.0e-8_dp
+  character(len=30), parameter :: plot_labels(6) = [ &
+    "F77 Ext. (implicit iface)      ", &
+    "Callback with RPAR/IPAR        ", &
+    "Callback C-Style (ctx)         ", &
+    "Functor Method (OOP)           ", &
+    "Reverse Communication          ", &
+    "Class(*) Select Type           "  ]
+  character(len=*), parameter :: plot_data_file = "build/mean_time_per_step.dat"
 
   real(dp) :: y(neqn), t, h
   real(dp), target :: work(neqn, 5)
@@ -26,10 +34,21 @@ program rk_benchmark
   integer(8) :: t1, t2, count_rate
   real(dp)   :: elapsed, mean_elapsed
   real(dp)   :: elapsed_all(6)   ! store mean elapsed time per integration
+  integer    :: plot_unit, io_stat
+  logical    :: plot_data_enabled
 
   work = 0.0_dp
 
   call system_clock(count_rate=count_rate)
+
+  plot_data_enabled = .false.
+  open(newunit=plot_unit, file=plot_data_file, status='replace', action='write', iostat=io_stat)
+  if (io_stat /= 0) then
+    write(error_unit,'(A,A)') "Warning: failed to open plot data file: ", plot_data_file
+  else
+    plot_data_enabled = .true.
+    write(plot_unit,'(A)') "# id us_per_step label"
+  end if
 
   write(*,'(A)') "RK23 Final Refactored Benchmark (Clean FSAL Property)"
   write(*,'(A,I0)') "Integrations per test: ", N_runs
@@ -53,7 +72,7 @@ program rk_benchmark
   elapsed = real(t2-t1, dp)/real(count_rate, dp)
   mean_elapsed = elapsed / real(N_runs, dp)
   elapsed_all(1) = mean_elapsed
-  call print_row(1, "F77 Ext. (implicit iface)", mean_elapsed, stats, y)
+  call print_row(1, plot_labels(1), mean_elapsed, stats, y, plot_unit, plot_data_enabled)
 
 
   ! ----------------------------------------------------------------------------
@@ -70,7 +89,7 @@ program rk_benchmark
   elapsed = real(t2-t1, dp)/real(count_rate, dp)
   mean_elapsed = elapsed / real(N_runs, dp)
   elapsed_all(2) = mean_elapsed
-  call print_row(2, "Callback with RPAR/IPAR", mean_elapsed, stats, y)
+  call print_row(2, plot_labels(2), mean_elapsed, stats, y, plot_unit, plot_data_enabled)
 
 
   ! ----------------------------------------------------------------------------
@@ -88,7 +107,7 @@ program rk_benchmark
   elapsed = real(t2-t1, dp)/real(count_rate, dp)
   mean_elapsed = elapsed / real(N_runs, dp)
   elapsed_all(3) = mean_elapsed
-  call print_row(3, "Callback C-Style (ctx)", mean_elapsed, stats, y)
+  call print_row(3, plot_labels(3), mean_elapsed, stats, y, plot_unit, plot_data_enabled)
 
 
   ! ----------------------------------------------------------------------------
@@ -104,7 +123,7 @@ program rk_benchmark
   elapsed = real(t2-t1, dp)/real(count_rate, dp)
   mean_elapsed = elapsed / real(N_runs, dp)
   elapsed_all(4) = mean_elapsed
-  call print_row(4, "Functor Method (OOP)", mean_elapsed, stats, y)
+  call print_row(4, plot_labels(4), mean_elapsed, stats, y, plot_unit, plot_data_enabled)
 
 
   ! ----------------------------------------------------------------------------
@@ -146,7 +165,7 @@ program rk_benchmark
     elapsed = real(t2-t1, dp)/real(count_rate, dp)
     mean_elapsed = elapsed / real(N_runs, dp)
     elapsed_all(5) = mean_elapsed
-    call print_row(5, "Reverse Communication", mean_elapsed, stats, y)
+    call print_row(5, plot_labels(5), mean_elapsed, stats, y, plot_unit, plot_data_enabled)
   end block
 
   ! ----------------------------------------------------------------------------
@@ -162,12 +181,17 @@ program rk_benchmark
   elapsed = real(t2-t1, dp)/real(count_rate, dp)
   mean_elapsed = elapsed / real(N_runs, dp)
   elapsed_all(6) = mean_elapsed
-  call print_row(6, "Class(*) Select Type", mean_elapsed, stats, y)
+  call print_row(6, plot_labels(6), mean_elapsed, stats, y, plot_unit, plot_data_enabled)
 
   write(*,'(A)') repeat("-", 80)
   write(*,'(A)') "Notes: Mean(s) is the mean time for one integration over all runs."
   write(*,'(A)') "       Steps and NFev are from the last run; Final Y is printed as a cross-check."
   write(*,'(A)') "       RK23 uses 3 evals per step attempt."
+
+  if (plot_data_enabled) then
+    close(plot_unit)
+    write(*,'(A,A)') "Wrote machine-readable plot data: ", trim(plot_data_file)
+  end if
 
   ! ----------------------------------------------------------------------------
   ! Callback overhead analysis
@@ -223,12 +247,14 @@ contains
     f(3) =  3.0e7_dp * y_ev(2)**2
   end subroutine rhs_internal
 
-  subroutine print_row(id, label, mean_elapsed, s, y_fin)
+  subroutine print_row(id, label, mean_elapsed, s, y_fin, plot_unit_out, plot_data_enabled_out)
     integer,          intent(in) :: id
     character(len=*), intent(in) :: label
     real(dp),         intent(in) :: mean_elapsed
     type(rk_stats),   intent(in) :: s
     real(dp),         intent(in) :: y_fin(neqn)
+    integer,          intent(in), optional :: plot_unit_out
+    logical,          intent(in), optional :: plot_data_enabled_out
 
     real(dp) :: us_per_step, us_per_nfev
 
@@ -247,6 +273,11 @@ contains
       id, ". ", label, mean_elapsed, s%accepted, s%rejected, s%nfev, &
       us_per_step, us_per_nfev
     write(*,'(A36,A,3ES12.4)') "", "Final Y:", y_fin
+    if (present(plot_unit_out) .and. present(plot_data_enabled_out)) then
+      if (plot_data_enabled_out) then
+        write(plot_unit_out,'(I2,1X,F12.4,1X,A)') id, us_per_step, '"'//trim(label)//'"'
+      end if
+    end if
   end subroutine print_row
 
 end program rk_benchmark
