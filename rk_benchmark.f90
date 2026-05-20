@@ -11,6 +11,7 @@ program rk_benchmark
   real(dp), parameter :: y_init(neqn) = [1.0_dp, 0.0_dp, 0.0_dp]
   real(dp), parameter :: t_start = 0.0_dp, t_end = 100.0_dp
   real(dp), parameter :: atol(neqn) = 1.0e-8_dp, rtol = 1.0e-8_dp
+  real(dp), parameter :: h_init = 1.0e-4_dp
   character(len=30), parameter :: plot_labels(6) = [ &
     "F77 Ext. (implicit iface)      ", &
     "Callback with RPAR/IPAR        ", &
@@ -85,7 +86,7 @@ program rk_benchmark
 
   ! 1 – reference run
   work = 0.0_dp
-  t = t_start; y = y_init; h = 1.0e-3_dp
+  t = t_start; y = y_init; h = h_init
   call rk23_simple(neqn, rhs_internal, t, y, t_end, h, atol, rtol, work, idid, stats)
   if (idid == -1) write(error_unit,*) "warm-up 1: step-size underflow!"
   y_ref = y
@@ -94,7 +95,7 @@ program rk_benchmark
   ! 2
   rpar = [0.04_dp, 1.0e4_dp, 3.0e7_dp]
   work = 0.0_dp
-  t = t_start; y = y_init; h = 1.0e-3_dp
+  t = t_start; y = y_init; h = h_init
   call rk23_par(neqn, rob_par, t, y, t_end, h, atol, rtol, work, rpar, ipar, idid, stats)
   if (idid == -1) write(error_unit,*) "warm-up 2: step-size underflow!"
   val_ok = is_close(y, y_ref, val_atol, val_rtol)
@@ -106,7 +107,7 @@ program rk_benchmark
   c_data%k1 = 0.04_dp; c_data%k2 = 1.0e4_dp; c_data%k3 = 3.0e7_dp
   p_data = c_loc(c_data)
   work = 0.0_dp
-  t = t_start; y = y_init; h = 1.0e-3_dp
+  t = t_start; y = y_init; h = h_init
   call rk23_cptr(neqn, rob_cptr, t, y, t_end, h, atol, rtol, work, p_data, idid, stats)
   if (idid == -1) write(error_unit,*) "warm-up 3: step-size underflow!"
   val_ok = is_close(y, y_ref, val_atol, val_rtol)
@@ -116,7 +117,7 @@ program rk_benchmark
 
   ! 4
   work = 0.0_dp
-  t = t_start; y = y_init; h = 1.0e-3_dp
+  t = t_start; y = y_init; h = h_init
   call rk23_tb(neqn, sys, t, y, t_end, h, atol, rtol, work, idid, stats)
   if (idid == -1) write(error_unit,*) "warm-up 4: step-size underflow!"
   val_ok = is_close(y, y_ref, val_atol, val_rtol)
@@ -125,7 +126,7 @@ program rk_benchmark
   write(*,'(I2,A2,A30,A8,3ES12.4)') 4, ". ", plot_labels(4), vstatus, y
 
   ! 5 – RCI
-  t = t_start; y = y_init; h = 1.0e-3_dp
+  t = t_start; y = y_init; h = h_init
   call run_rci(t, y, h, idid, stats, "warm-up 5")
   val_ok = is_close(y, y_ref, val_atol, val_rtol)
   if (.not. val_ok) n_fail = n_fail + 1
@@ -134,7 +135,7 @@ program rk_benchmark
 
   ! 6
   work = 0.0_dp
-  t = t_start; y = y_init; h = 1.0e-3_dp
+  t = t_start; y = y_init; h = h_init
   call rk23_class_star(neqn, rob_class_star, t, y, t_end, h, atol, rtol, work, params, idid, stats)
   if (idid == -1) write(error_unit,*) "warm-up 6: step-size underflow!"
   val_ok = is_close(y, y_ref, val_atol, val_rtol)
@@ -166,7 +167,7 @@ program rk_benchmark
   ! ----------------------------------------------------------------------------
   call system_clock(t1)
   do i = 1, N_runs
-    t = t_start; y = y_init; h = 1.0e-3_dp
+    t = t_start; y = y_init; h = h_init
     call rk23_simple(neqn, rhs_internal, t, y, t_end, h, atol, rtol, work, idid, stats)
     if (idid == -1) write(error_unit,*) "1. Step-size underflow!"
   end do
@@ -183,7 +184,7 @@ program rk_benchmark
   rpar = [0.04_dp, 1.0e4_dp, 3.0e7_dp]
   call system_clock(t1)
   do i = 1, N_runs
-    t = t_start; y = y_init; h = 1.0e-3_dp
+    t = t_start; y = y_init; h = h_init
     call rk23_par(neqn, rob_par, t, y, t_end, h, atol, rtol, work, rpar, ipar, idid, stats)
     if (idid == -1) write(error_unit,*) "2. Step-size underflow!"
   end do
@@ -201,7 +202,7 @@ program rk_benchmark
   p_data = c_loc(c_data)
   call system_clock(t1)
   do i = 1, N_runs
-    t = t_start; y = y_init; h = 1.0e-3_dp
+    t = t_start; y = y_init; h = h_init
     call rk23_cptr(neqn, rob_cptr, t, y, t_end, h, atol, rtol, work, p_data, idid, stats)
     if (idid == -1) write(error_unit,*) "3. Step-size underflow!"
   end do
@@ -217,7 +218,7 @@ program rk_benchmark
   ! ----------------------------------------------------------------------------
   call system_clock(t1)
   do i = 1, N_runs
-    t = t_start; y = y_init; h = 1.0e-3_dp
+    t = t_start; y = y_init; h = h_init
     call rk23_tb(neqn, sys, t, y, t_end, h, atol, rtol, work, idid, stats)
     if (idid == -1) write(error_unit,*) "4. Step-size underflow!"
   end do
@@ -233,7 +234,7 @@ program rk_benchmark
   ! ----------------------------------------------------------------------------
   call system_clock(t1)
   do i = 1, N_runs
-    t = t_start; y = y_init; h = 1.0e-3_dp
+    t = t_start; y = y_init; h = h_init
     call run_rci(t, y, h, idid, stats, "5")
   end do
   call system_clock(t2)
@@ -247,7 +248,7 @@ program rk_benchmark
   ! ----------------------------------------------------------------------------
   call system_clock(t1)
   do i = 1, N_runs
-    t = t_start; y = y_init; h = 1.0e-3_dp
+    t = t_start; y = y_init; h = h_init
     call rk23_class_star(neqn, rob_class_star, t, y, t_end, h, atol, rtol, work, params, idid, stats)
     if (idid == -1) write(error_unit,*) "6. Step-size underflow!"
   end do
@@ -363,6 +364,7 @@ contains
 
     integer  :: stage
     real(dp) :: t_eval, y_eval(neqn)
+    logical  :: step_rejected
 
     work = 0.0_dp
     idid = 0
@@ -372,10 +374,11 @@ contains
     call rob_direct(neqn, t, y, work(:, 1))
     stats%nfev = stats%nfev + 1
     stage = 1
+    step_rejected = .false.
 
     rci_loop: do
       call rk23_rci(stage, neqn, t, y, t_end, h, atol, rtol, work, &
-                    t_eval, y_eval, idid, stats)
+                    t_eval, y_eval, idid, stats, step_rejected)
       select case(stage)
       case(2:4)
         call rob_direct(neqn, t_eval, y_eval, work(:, stage))
