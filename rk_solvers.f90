@@ -53,7 +53,7 @@ contains
           exit integrate
         end if
 
-        call rk23_step(h, y_new, err)
+        call rk23_step(neqn, fun, t, h, y, work(:,1), work(:,2), work(:,3), work(:,4), work(:,5), atol, rtol, y_new, err)
         fac = 0.9_dp * (1.0_dp / max(err, 1.0e-10_dp))**(1.0_dp/3.0_dp)
 
         if (err <= 1.0_dp) then
@@ -70,23 +70,24 @@ contains
     end do integrate
 
   contains
-    subroutine rk23_step(dt, y_next, err_val)
-      real(dp), intent(in)  :: dt
-      real(dp), intent(out) :: y_next(neqn), err_val
-      real(dp) :: err_vec(neqn)
+    subroutine rk23_step(n, fn, t_cur, dt, y_cur, k1, k2, k3, k4, tmp, a_tol, r_tol, y_next, err_val)
+      integer,  intent(in)  :: n
+      procedure(func_simple) :: fn
+      real(dp), intent(in)  :: t_cur, dt, y_cur(*), k1(*), a_tol(*), r_tol
+      real(dp), intent(out) :: k2(*), k3(*), k4(*), tmp(*), y_next(*), err_val
 
-      work(:,5) = y + dt * 0.5_dp * work(:,1)
-      call fun(neqn, t + 0.5_dp*dt, work(:,5), work(:,2))
+      tmp(1:n) = y_cur(1:n) + dt * 0.5_dp * k1(1:n)
+      call fn(n, t_cur + 0.5_dp*dt, tmp, k2)
 
-      work(:,5) = y + dt * 0.75_dp * work(:,2)
-      call fun(neqn, t + 0.75_dp*dt, work(:,5), work(:,3))
+      tmp(1:n) = y_cur(1:n) + dt * 0.75_dp * k2(1:n)
+      call fn(n, t_cur + 0.75_dp*dt, tmp, k3)
 
-      y_next = y + dt * ((2.0_dp/9.0_dp)*work(:,1) + (1.0_dp/3.0_dp)*work(:,2) + (4.0_dp/9.0_dp)*work(:,3))
-      call fun(neqn, t + dt, y_next, work(:,4))
+      y_next(1:n) = y_cur(1:n) + dt * ((2.0_dp/9.0_dp)*k1(1:n) + (1.0_dp/3.0_dp)*k2(1:n) + (4.0_dp/9.0_dp)*k3(1:n))
+      call fn(n, t_cur + dt, y_next, k4)
 
-      err_vec = dt * (-5.0_dp/72.0_dp * work(:,1) + 1.0_dp/12.0_dp * work(:,2) + &
-                       1.0_dp/9.0_dp * work(:,3) - 1.0_dp/8.0_dp * work(:,4))
-      err_val = weighted_norm(neqn, y, y_next, err_vec, atol, rtol)
+      tmp(1:n) = dt * (-5.0_dp/72.0_dp * k1(1:n) + 1.0_dp/12.0_dp * k2(1:n) + &
+                        1.0_dp/9.0_dp * k3(1:n) - 1.0_dp/8.0_dp * k4(1:n))
+      err_val = weighted_norm(n, y_cur, y_next, tmp, a_tol, r_tol)
     end subroutine rk23_step
 
   end subroutine rk23_simple
@@ -119,7 +120,8 @@ contains
           exit integrate
         end if
 
-        call rk23_step(h, y_new, err)
+        call rk23_step(neqn, fun, t, h, y, work(:,1), work(:,2), work(:,3), &
+                       work(:,4), work(:,5), atol, rtol, rpar, ipar, y_new, err)
         fac = 0.9_dp * (1.0_dp / max(err, 1.0e-10_dp))**(1.0_dp/3.0_dp)
 
         if (err <= 1.0_dp) then
@@ -135,23 +137,26 @@ contains
     end do integrate
 
   contains
-    subroutine rk23_step(dt, y_next, err_val)
-      real(dp), intent(in)  :: dt
-      real(dp), intent(out) :: y_next(neqn), err_val
-      real(dp) :: err_vec(neqn)
+    subroutine rk23_step(n, fn, t_cur, dt, y_cur, k1, k2, k3, k4, tmp, a_tol, r_tol, rp, ip, y_next, err_val)
+      integer,  intent(in)  :: n
+      procedure(func_par) :: fn
+      real(dp), intent(in)  :: t_cur, dt, y_cur(*), k1(*), a_tol(*), r_tol
+      real(dp), intent(inout) :: rp(*)
+      integer,  intent(inout) :: ip(*)
+      real(dp), intent(out) :: k2(*), k3(*), k4(*), tmp(*), y_next(*), err_val
 
-      work(:,5) = y + dt * 0.5_dp * work(:,1)
-      call fun(neqn, t + 0.5_dp*dt, work(:,5), work(:,2), rpar, ipar)
+      tmp(1:n) = y_cur(1:n) + dt * 0.5_dp * k1(1:n)
+      call fn(n, t_cur + 0.5_dp*dt, tmp, k2, rp, ip)
 
-      work(:,5) = y + dt * 0.75_dp * work(:,2)
-      call fun(neqn, t + 0.75_dp*dt, work(:,5), work(:,3), rpar, ipar)
+      tmp(1:n) = y_cur(1:n) + dt * 0.75_dp * k2(1:n)
+      call fn(n, t_cur + 0.75_dp*dt, tmp, k3, rp, ip)
 
-      y_next = y + dt * ((2.0_dp/9.0_dp)*work(:,1) + (1.0_dp/3.0_dp)*work(:,2) + (4.0_dp/9.0_dp)*work(:,3))
-      call fun(neqn, t + dt, y_next, work(:,4), rpar, ipar)
+      y_next(1:n) = y_cur(1:n) + dt * ((2.0_dp/9.0_dp)*k1(1:n) + (1.0_dp/3.0_dp)*k2(1:n) + (4.0_dp/9.0_dp)*k3(1:n))
+      call fn(n, t_cur + dt, y_next, k4, rp, ip)
 
-      err_vec = dt * (-5.0_dp/72.0_dp * work(:,1) + 1.0_dp/12.0_dp * work(:,2) + &
-                       1.0_dp/9.0_dp * work(:,3) - 1.0_dp/8.0_dp * work(:,4))
-      err_val = weighted_norm(neqn, y, y_next, err_vec, atol, rtol)
+      tmp(1:n) = dt * (-5.0_dp/72.0_dp * k1(1:n) + 1.0_dp/12.0_dp * k2(1:n) + &
+                        1.0_dp/9.0_dp * k3(1:n) - 1.0_dp/8.0_dp * k4(1:n))
+      err_val = weighted_norm(n, y_cur, y_next, tmp, a_tol, r_tol)
     end subroutine rk23_step
 
   end subroutine rk23_par
@@ -183,7 +188,7 @@ contains
           exit integrate
         end if
 
-        call rk23_step(h, y_new, err)
+        call rk23_step(neqn, fun, t, h, y, work(:,1), work(:,2), work(:,3), work(:,4), work(:,5), atol, rtol, ctx, y_new, err)
         fac = 0.9_dp * (1.0_dp / max(err, 1.0e-10_dp))**(1.0_dp/3.0_dp)
 
         if (err <= 1.0_dp) then
@@ -199,23 +204,25 @@ contains
     end do integrate
 
   contains
-    subroutine rk23_step(dt, y_next, err_val)
-      real(dp), intent(in)  :: dt
-      real(dp), intent(out) :: y_next(neqn), err_val
-      real(dp) :: err_vec(neqn)
+    subroutine rk23_step(n, fn, t_cur, dt, y_cur, k1, k2, k3, k4, tmp, a_tol, r_tol, cctx, y_next, err_val)
+      integer,  intent(in)  :: n
+      procedure(func_cptr) :: fn
+      real(dp), intent(in)  :: t_cur, dt, y_cur(*), k1(*), a_tol(*), r_tol
+      type(c_ptr), value    :: cctx
+      real(dp), intent(out) :: k2(*), k3(*), k4(*), tmp(*), y_next(*), err_val
 
-      work(:,5) = y + dt * 0.5_dp * work(:,1)
-      call fun(neqn, t + 0.5_dp*dt, work(:,5), work(:,2), ctx)
+      tmp(1:n) = y_cur(1:n) + dt * 0.5_dp * k1(1:n)
+      call fn(n, t_cur + 0.5_dp*dt, tmp, k2, cctx)
 
-      work(:,5) = y + dt * 0.75_dp * work(:,2)
-      call fun(neqn, t + 0.75_dp*dt, work(:,5), work(:,3), ctx)
+      tmp(1:n) = y_cur(1:n) + dt * 0.75_dp * k2(1:n)
+      call fn(n, t_cur + 0.75_dp*dt, tmp, k3, cctx)
 
-      y_next = y + dt * ((2.0_dp/9.0_dp)*work(:,1) + (1.0_dp/3.0_dp)*work(:,2) + (4.0_dp/9.0_dp)*work(:,3))
-      call fun(neqn, t + dt, y_next, work(:,4), ctx)
+      y_next(1:n) = y_cur(1:n) + dt * ((2.0_dp/9.0_dp)*k1(1:n) + (1.0_dp/3.0_dp)*k2(1:n) + (4.0_dp/9.0_dp)*k3(1:n))
+      call fn(n, t_cur + dt, y_next, k4, cctx)
 
-      err_vec = dt * (-5.0_dp/72.0_dp * work(:,1) + 1.0_dp/12.0_dp * work(:,2) + &
-                       1.0_dp/9.0_dp * work(:,3) - 1.0_dp/8.0_dp * work(:,4))
-      err_val = weighted_norm(neqn, y, y_next, err_vec, atol, rtol)
+      tmp(1:n) = dt * (-5.0_dp/72.0_dp * k1(1:n) + 1.0_dp/12.0_dp * k2(1:n) + &
+                        1.0_dp/9.0_dp * k3(1:n) - 1.0_dp/8.0_dp * k4(1:n))
+      err_val = weighted_norm(n, y_cur, y_next, tmp, a_tol, r_tol)
     end subroutine rk23_step
 
   end subroutine rk23_cptr
@@ -246,7 +253,7 @@ contains
           exit integrate
         end if
 
-        call rk23_step(h, y_new, err)
+        call rk23_step(neqn, fun, t, h, y, work(:,1), work(:,2), work(:,3), work(:,4), work(:,5), atol, rtol, y_new, err)
         fac = 0.9_dp * (1.0_dp / max(err, 1.0e-10_dp))**(1.0_dp/3.0_dp)
 
         if (err <= 1.0_dp) then
@@ -262,23 +269,24 @@ contains
     end do integrate
 
   contains
-    subroutine rk23_step(dt, y_next, err_val)
-      real(dp), intent(in)  :: dt
-      real(dp), intent(out) :: y_next(neqn), err_val
-      real(dp) :: err_vec(neqn)
+    subroutine rk23_step(n, fn, t_cur, dt, y_cur, k1, k2, k3, k4, tmp, a_tol, r_tol, y_next, err_val)
+      integer,  intent(in)  :: n
+      class(ode_functor), intent(inout) :: fn
+      real(dp), intent(in)  :: t_cur, dt, y_cur(*), k1(*), a_tol(*), r_tol
+      real(dp), intent(out) :: k2(*), k3(*), k4(*), tmp(*), y_next(*), err_val
 
-      work(:,5) = y + dt * 0.5_dp * work(:,1)
-      call fun%eval(neqn, t + 0.5_dp*dt, work(:,5), work(:,2))
+      tmp(1:n) = y_cur(1:n) + dt * 0.5_dp * k1(1:n)
+      call fn%eval(n, t_cur + 0.5_dp*dt, tmp(1:n), k2(1:n))
 
-      work(:,5) = y + dt * 0.75_dp * work(:,2)
-      call fun%eval(neqn, t + 0.75_dp*dt, work(:,5), work(:,3))
+      tmp(1:n) = y_cur(1:n) + dt * 0.75_dp * k2(1:n)
+      call fn%eval(n, t_cur + 0.75_dp*dt, tmp(1:n), k3(1:n))
 
-      y_next = y + dt * ((2.0_dp/9.0_dp)*work(:,1) + (1.0_dp/3.0_dp)*work(:,2) + (4.0_dp/9.0_dp)*work(:,3))
-      call fun%eval(neqn, t + dt, y_next, work(:,4))
+      y_next(1:n) = y_cur(1:n) + dt * ((2.0_dp/9.0_dp)*k1(1:n) + (1.0_dp/3.0_dp)*k2(1:n) + (4.0_dp/9.0_dp)*k3(1:n))
+      call fn%eval(n, t_cur + dt, y_next(1:n), k4(1:n))
 
-      err_vec = dt * (-5.0_dp/72.0_dp * work(:,1) + 1.0_dp/12.0_dp * work(:,2) + &
-                       1.0_dp/9.0_dp * work(:,3) - 1.0_dp/8.0_dp * work(:,4))
-      err_val = weighted_norm(neqn, y, y_next, err_vec, atol, rtol)
+      tmp(1:n) = dt * (-5.0_dp/72.0_dp * k1(1:n) + 1.0_dp/12.0_dp * k2(1:n) + &
+                        1.0_dp/9.0_dp * k3(1:n) - 1.0_dp/8.0_dp * k4(1:n))
+      err_val = weighted_norm(n, y_cur, y_next, tmp, a_tol, r_tol)
     end subroutine rk23_step
 
   end subroutine rk23_tb
@@ -368,7 +376,7 @@ contains
           exit integrate
         end if
 
-        call rk23_step(h, y_new, err)
+        call rk23_step(neqn, fun, t, h, y, work(:,1), work(:,2), work(:,3), work(:,4), work(:,5), atol, rtol, ctx, y_new, err)
         fac = 0.9_dp * (1.0_dp / max(err, 1.0e-10_dp))**(1.0_dp/3.0_dp)
 
         if (err <= 1.0_dp) then
@@ -384,23 +392,25 @@ contains
     end do integrate
 
   contains
-    subroutine rk23_step(dt, y_next, err_val)
-      real(dp), intent(in)  :: dt
-      real(dp), intent(out) :: y_next(neqn), err_val
-      real(dp) :: err_vec(neqn)
+    subroutine rk23_step(n, fn, t_cur, dt, y_cur, k1, k2, k3, k4, tmp, a_tol, r_tol, cctx, y_next, err_val)
+      integer,  intent(in)  :: n
+      procedure(func_class_star) :: fn
+      real(dp), intent(in)  :: t_cur, dt, y_cur(*), k1(*), a_tol(*), r_tol
+      class(*), intent(inout) :: cctx
+      real(dp), intent(out) :: k2(*), k3(*), k4(*), tmp(*), y_next(*), err_val
 
-      work(:,5) = y + dt * 0.5_dp * work(:,1)
-      call fun(neqn, t + 0.5_dp*dt, work(:,5), work(:,2), ctx)
+      tmp(1:n) = y_cur(1:n) + dt * 0.5_dp * k1(1:n)
+      call fn(n, t_cur + 0.5_dp*dt, tmp, k2, cctx)
 
-      work(:,5) = y + dt * 0.75_dp * work(:,2)
-      call fun(neqn, t + 0.75_dp*dt, work(:,5), work(:,3), ctx)
+      tmp(1:n) = y_cur(1:n) + dt * 0.75_dp * k2(1:n)
+      call fn(n, t_cur + 0.75_dp*dt, tmp, k3, cctx)
 
-      y_next = y + dt * ((2.0_dp/9.0_dp)*work(:,1) + (1.0_dp/3.0_dp)*work(:,2) + (4.0_dp/9.0_dp)*work(:,3))
-      call fun(neqn, t + dt, y_next, work(:,4), ctx)
+      y_next(1:n) = y_cur(1:n) + dt * ((2.0_dp/9.0_dp)*k1(1:n) + (1.0_dp/3.0_dp)*k2(1:n) + (4.0_dp/9.0_dp)*k3(1:n))
+      call fn(n, t_cur + dt, y_next, k4, cctx)
 
-      err_vec = dt * (-5.0_dp/72.0_dp * work(:,1) + 1.0_dp/12.0_dp * work(:,2) + &
-                       1.0_dp/9.0_dp * work(:,3) - 1.0_dp/8.0_dp * work(:,4))
-      err_val = weighted_norm(neqn, y, y_next, err_vec, atol, rtol)
+      tmp(1:n) = dt * (-5.0_dp/72.0_dp * k1(1:n) + 1.0_dp/12.0_dp * k2(1:n) + &
+                        1.0_dp/9.0_dp * k3(1:n) - 1.0_dp/8.0_dp * k4(1:n))
+      err_val = weighted_norm(n, y_cur, y_next, tmp, a_tol, r_tol)
     end subroutine rk23_step
 
   end subroutine rk23_class_star
