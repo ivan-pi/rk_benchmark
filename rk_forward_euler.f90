@@ -11,9 +11,9 @@ contains
     real(dp), intent(in)    :: h
     real(dp), intent(inout) :: t, y(neqn)
     real(dp) :: dy(neqn)
-    integer  :: rep
+    integer  :: step
 
-    do rep = 1, n_steps
+    do step = 1, n_steps
       call rob_direct(neqn, t, y, dy)
       y = y + h * dy
       t = t + h
@@ -26,9 +26,9 @@ contains
     real(dp), intent(inout) :: t, y(neqn)
     external :: fun
     real(dp) :: dy(neqn)
-    integer  :: rep
+    integer  :: step
 
-    do rep = 1, n_steps
+    do step = 1, n_steps
       call fun(neqn, t, y, dy)
       y = y + h * dy
       t = t + h
@@ -43,9 +43,9 @@ contains
     real(dp), intent(inout) :: rpar(*)
     integer,  intent(inout) :: ipar(*)
     real(dp) :: dy(neqn)
-    integer  :: rep
+    integer  :: step
 
-    do rep = 1, n_steps
+    do step = 1, n_steps
       call fun(neqn, t, y, dy, rpar, ipar)
       y = y + h * dy
       t = t + h
@@ -59,9 +59,9 @@ contains
     procedure(func_cptr)    :: fun
     type(c_ptr), value      :: ctx
     real(dp) :: dy(neqn)
-    integer  :: rep
+    integer  :: step
 
-    do rep = 1, n_steps
+    do step = 1, n_steps
       call fun(neqn, t, y, dy, ctx)
       y = y + h * dy
       t = t + h
@@ -74,9 +74,9 @@ contains
     real(dp), intent(inout) :: t, y(neqn)
     class(ode_functor), intent(inout) :: functor
     real(dp) :: dy(neqn)
-    integer  :: rep
+    integer  :: step
 
-    do rep = 1, n_steps
+    do step = 1, n_steps
       call functor%eval(neqn, t, y, dy)
       y = y + h * dy
       t = t + h
@@ -90,9 +90,9 @@ contains
     procedure(func_class_star) :: fun
     class(*), intent(inout) :: ctx
     real(dp) :: dy(neqn)
-    integer  :: rep
+    integer  :: step
 
-    do rep = 1, n_steps
+    do step = 1, n_steps
       call fun(neqn, t, y, dy, ctx)
       y = y + h * dy
       t = t + h
