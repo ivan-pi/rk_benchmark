@@ -77,6 +77,8 @@ To produce a horizontal bar-chart PNG of mean time per step with gnuplot:
 
 ## Interpreting results
 
+<img src="./results/mean_time_per_step.png" alt="Performance micro-benchmark bar plot" width="600">
+
 ```
 --------------------------------------------------------------------------------
                          Interface   Mean(s)   Steps     Rej    NFev     us/step
@@ -105,7 +107,7 @@ indicate an implementation error.
 
 The six `rk23_*` routines exist to compare callback dispatch overhead, not to serve as production ODE solvers. The following limitations are intentional:
 
-* **Forward integration only.** All variants assume `tend > t` and `h > 0`; the termination and endpoint-clipping logic is not direction-aware.
+* **Forward integration only.** All variants assume `tend > t` and `h > 0; the termination and endpoint-clipping logic is not direction-aware.
 * **Fixed I-controller.** Step-size adaptation uses a simple `fac = 0.9 * (1/err)^(1/3)` with `[0.2, 5.0]` clamping — no PI/PID controller, no stiffness detection.
 * **No single-step mode.** Each call integrates from t to tend in one shot; intermediate output requires repeated calls with shorter tend. The reverse-communication variant is the exception by construction.
 * **No NaN/Inf checking.** A right-hand side returning non-finite values propagates silently through the error norm and acceptance test.
