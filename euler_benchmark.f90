@@ -1,6 +1,7 @@
 program euler_benchmark
   use rk_kinds
   use rk_types
+  use rk_forward_euler
   use robertson_models
   use iso_fortran_env, only: error_unit
   implicit none
@@ -95,13 +96,13 @@ program euler_benchmark
 
   ! 1 – reference run: direct inline
   t = t_start; y = y_init
-  call run_euler_direct(t, y)
+  call run_euler_direct(neqn, N_steps, h_euler, t, y)
   y_ref = y
   write(*,'(I2,A2,A30,A8,3ES12.4)') 1, ". ", plot_labels(1), "REF     ", y_ref
 
   ! 2 – F77-style external callback
   t = t_start; y = y_init
-  call run_euler_f77(t, y)
+  call run_euler_f77(neqn, N_steps, h_euler, t, y, rob_direct)
   val_ok = is_close(y, y_ref, val_atol, val_rtol)
   if (.not. val_ok) n_fail = n_fail + 1
   vstatus = merge("PASS    ", "FAIL    ", val_ok)
@@ -109,7 +110,7 @@ program euler_benchmark
 
   ! 3 – RPAR/IPAR callback
   t = t_start; y = y_init
-  call run_euler_par(t, y)
+  call run_euler_par(neqn, N_steps, h_euler, t, y, rob_par, rpar, ipar)
   val_ok = is_close(y, y_ref, val_atol, val_rtol)
   if (.not. val_ok) n_fail = n_fail + 1
   vstatus = merge("PASS    ", "FAIL    ", val_ok)
@@ -117,7 +118,7 @@ program euler_benchmark
 
   ! 4 – C-style pointer
   t = t_start; y = y_init
-  call run_euler_cptr(t, y)
+  call run_euler_cptr(neqn, N_steps, h_euler, t, y, rob_cptr, p_data)
   val_ok = is_close(y, y_ref, val_atol, val_rtol)
   if (.not. val_ok) n_fail = n_fail + 1
   vstatus = merge("PASS    ", "FAIL    ", val_ok)
@@ -125,7 +126,7 @@ program euler_benchmark
 
   ! 5 – Functor OOP
   t = t_start; y = y_init
-  call run_euler_tb(t, y)
+  call run_euler_tb(neqn, N_steps, h_euler, t, y, sys)
   val_ok = is_close(y, y_ref, val_atol, val_rtol)
   if (.not. val_ok) n_fail = n_fail + 1
   vstatus = merge("PASS    ", "FAIL    ", val_ok)
@@ -133,7 +134,7 @@ program euler_benchmark
 
   ! 6 – Class(*) Select Type
   t = t_start; y = y_init
-  call run_euler_class_star(t, y)
+  call run_euler_class_star(neqn, N_steps, h_euler, t, y, rob_class_star, params)
   val_ok = is_close(y, y_ref, val_atol, val_rtol)
   if (.not. val_ok) n_fail = n_fail + 1
   vstatus = merge("PASS    ", "FAIL    ", val_ok)
@@ -159,7 +160,7 @@ program euler_benchmark
   call system_clock(t1)
   do i = 1, N_runs
     t = t_start; y = y_init
-    call run_euler_direct(t, y)
+    call run_euler_direct(neqn, N_steps, h_euler, t, y)
   end do
   call system_clock(t2)
   elapsed = real(t2-t1, dp) / real(count_rate, dp)
@@ -171,7 +172,7 @@ program euler_benchmark
   call system_clock(t1)
   do i = 1, N_runs
     t = t_start; y = y_init
-    call run_euler_f77(t, y)
+    call run_euler_f77(neqn, N_steps, h_euler, t, y, rob_direct)
   end do
   call system_clock(t2)
   elapsed = real(t2-t1, dp) / real(count_rate, dp)
@@ -183,7 +184,7 @@ program euler_benchmark
   call system_clock(t1)
   do i = 1, N_runs
     t = t_start; y = y_init
-    call run_euler_par(t, y)
+    call run_euler_par(neqn, N_steps, h_euler, t, y, rob_par, rpar, ipar)
   end do
   call system_clock(t2)
   elapsed = real(t2-t1, dp) / real(count_rate, dp)
@@ -195,7 +196,7 @@ program euler_benchmark
   call system_clock(t1)
   do i = 1, N_runs
     t = t_start; y = y_init
-    call run_euler_cptr(t, y)
+    call run_euler_cptr(neqn, N_steps, h_euler, t, y, rob_cptr, p_data)
   end do
   call system_clock(t2)
   elapsed = real(t2-t1, dp) / real(count_rate, dp)
@@ -207,7 +208,7 @@ program euler_benchmark
   call system_clock(t1)
   do i = 1, N_runs
     t = t_start; y = y_init
-    call run_euler_tb(t, y)
+    call run_euler_tb(neqn, N_steps, h_euler, t, y, sys)
   end do
   call system_clock(t2)
   elapsed = real(t2-t1, dp) / real(count_rate, dp)
@@ -219,7 +220,7 @@ program euler_benchmark
   call system_clock(t1)
   do i = 1, N_runs
     t = t_start; y = y_init
-    call run_euler_class_star(t, y)
+    call run_euler_class_star(neqn, N_steps, h_euler, t, y, rob_class_star, params)
   end do
   call system_clock(t2)
   elapsed = real(t2-t1, dp) / real(count_rate, dp)
@@ -280,77 +281,6 @@ contains
     real(dp), intent(in) :: y(:), y_ref(:), atol_v, rtol_v
     is_close = all(abs(y - y_ref) <= atol_v + rtol_v * abs(y_ref))
   end function is_close
-
-  ! ─── Pseudo-integrators: one per callback style ──────────────────────────
-  ! Each subroutine advances (t, y) by N_steps fixed Euler steps of size h_euler.
-  ! They are called identically from both the validation pass and the benchmark
-  ! pass, eliminating duplication between the two phases.
-
-  subroutine run_euler_direct(t, y)
-    real(dp), intent(inout) :: t, y(neqn)
-    real(dp) :: dy(neqn)
-    integer  :: rep
-    do rep = 1, N_steps
-      call rob_direct(neqn, t, y, dy)
-      y = y + h_euler * dy
-      t = t + h_euler
-    end do
-  end subroutine run_euler_direct
-
-  subroutine run_euler_f77(t, y)
-    real(dp), intent(inout) :: t, y(neqn)
-    real(dp) :: dy(neqn)
-    integer  :: rep
-    do rep = 1, N_steps
-      call rob_direct(neqn, t, y, dy)
-      y = y + h_euler * dy
-      t = t + h_euler
-    end do
-  end subroutine run_euler_f77
-
-  subroutine run_euler_par(t, y)
-    real(dp), intent(inout) :: t, y(neqn)
-    real(dp) :: dy(neqn)
-    integer  :: rep
-    do rep = 1, N_steps
-      call rob_par(neqn, t, y, dy, rpar, ipar)
-      y = y + h_euler * dy
-      t = t + h_euler
-    end do
-  end subroutine run_euler_par
-
-  subroutine run_euler_cptr(t, y)
-    real(dp), intent(inout) :: t, y(neqn)
-    real(dp) :: dy(neqn)
-    integer  :: rep
-    do rep = 1, N_steps
-      call rob_cptr(neqn, t, y, dy, p_data)
-      y = y + h_euler * dy
-      t = t + h_euler
-    end do
-  end subroutine run_euler_cptr
-
-  subroutine run_euler_tb(t, y)
-    real(dp), intent(inout) :: t, y(neqn)
-    real(dp) :: dy(neqn)
-    integer  :: rep
-    do rep = 1, N_steps
-      call sys%eval(neqn, t, y, dy)
-      y = y + h_euler * dy
-      t = t + h_euler
-    end do
-  end subroutine run_euler_tb
-
-  subroutine run_euler_class_star(t, y)
-    real(dp), intent(inout) :: t, y(neqn)
-    real(dp) :: dy(neqn)
-    integer  :: rep
-    do rep = 1, N_steps
-      call rob_class_star(neqn, t, y, dy, params)
-      y = y + h_euler * dy
-      t = t + h_euler
-    end do
-  end subroutine run_euler_class_star
 
   subroutine print_row(id, label, mean_elapsed, nsteps, plot_unit_out, plot_data_enabled_out)
     integer,          intent(in) :: id

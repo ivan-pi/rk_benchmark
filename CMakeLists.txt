@@ -13,7 +13,7 @@ target_link_libraries(robertson_lib PRIVATE rk_lib)
 add_executable(rk_benchmark rk_benchmark.F90)
 target_link_libraries(rk_benchmark PRIVATE rk_lib robertson_lib)
 
-add_executable(euler_benchmark euler_benchmark.f90)
+add_executable(euler_benchmark rk_forward_euler.f90 euler_benchmark.f90)
 target_link_libraries(euler_benchmark PRIVATE rk_lib robertson_lib)
 
 if(ENABLE_C_SOLVER)
