@@ -19,11 +19,11 @@ from scipy.integrate import solve_ivp
 
 def robertson(t, y):
     k1, k2, k3 = 0.04, 1.0e4, 3.0e7
-    return [
+    return np.array([
         -k1 * y[0] + k2 * y[1] * y[2],
          k1 * y[0] - k2 * y[1] * y[2] - k3 * y[1] ** 2,
          k3 * y[1] ** 2,
-    ]
+    ])
 
 
 y0 = [1.0, 0.0, 0.0]
