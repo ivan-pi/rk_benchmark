@@ -1,7 +1,9 @@
+#!/usr/bin/awk -f
+
 # Extract approach label and mean "us/step" from rk_benchmark text output.
 #
 # Usage from repository root:
-#   ./build/rk_benchmark | awk -f scripts/extract_mean_time_per_step.awk
+#   ./build/rk_benchmark | ./scripts/extract_mean_time_per_step.awk
 #
 # Output format:
 #   <approach label>\t<mean us/step>
