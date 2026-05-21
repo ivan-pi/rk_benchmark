@@ -93,3 +93,19 @@ previous accepted step.
 All workspace (`work(neqn, 5)`) is allocated by the caller and passed into
 the solver, so no allocation occurs inside the solver loop.  See the main
 README for the full list of solver caveats.
+
+## Other
+
+Relevant discussions on Fortran Discourse:
+- [Is creating nested subroutines/functions considered good practice in Fortran? ](https://fortran-lang.discourse.group/t/is-creating-nested-subroutines-functions-considered-good-practice-in-fortran/6545)
+- [Implementation of a parametrized objective function without using module variables or internal subroutines](https://fortran-lang.discourse.group/t/implementation-of-a-parametrized-objective-function-without-using-module-variables-or-internal-subroutines/9919)
+- [stdlib_LinAlgOperators: Linear Algebra Operators](https://fortran-lang.discourse.group/t/stdlib-linalgoperators-linear-algebra-operators/9286)
+- [What is benefit of PASS in type-bound procedures?](https://fortran-lang.discourse.group/t/what-is-benefit-of-pass-in-type-bound-procedures/9294)
+- [Generic or Kind-Agnostic linear system solvers](https://fortran-lang.discourse.group/t/generic-or-kind-agnostic-linear-system-solvers/7574)
+- [ODE solvers and Autodiff](https://fortran-lang.discourse.group/t/ode-solvers-and-autodiff/10899)
+
+
+Other links:
+- [Doctor Fortran in “Think, Thank, Thunk”](https://stevelionel.com/drfortran/2009/09/02/doctor-fortran-in-think-thank-thunk/)
+- [Funarg problem](https://en.wikipedia.org/wiki/Funarg_problem)
+- [Support for Nested Functions (GCC)](https://gcc.gnu.org/onlinedocs/gccint/Trampolines.html)
