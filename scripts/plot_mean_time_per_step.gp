@@ -1,4 +1,12 @@
 #!/usr/bin/env gnuplot
+#
+# Usage:
+#   ./scripts/plot_mean_time_per_step.gp
+#   gnuplot -e 'ARG1="GFortran 14.2 - -O3"' scripts/plot_mean_time_per_step.gp
+#
+# An optional positional argument (ARG1) sets the plot title.
+# If omitted, a default title is used.
+# Run the benchmark executable first to generate build/mean_time_per_step.dat.
 
 reset session
 
