@@ -99,3 +99,15 @@ To produce a horizontal bar-chart PNG of mean time per step with gnuplot:
 For a non-chaotic problem like Robertson kinetics all strategies should produce
 identical `Final Y` values (up to floating-point rounding).  Differences
 indicate an implementation error.
+
+
+## Solver caveats
+
+The six `rk23_*` routines exist to compare callback dispatch overhead, not to serve as production ODE solvers. The following limitations are intentional:
+
+* **Forward integration only.** All variants assume `tend > t` and `h > 0`; the termination and endpoint-clipping logic is not direction-aware.
+* **Fixed I-controller.** Step-size adaptation uses a simple `fac = 0.9 * (1/err)^(1/3)` with `[0.2, 5.0]` clamping — no PI/PID controller, no stiffness detection.
+* **No single-step mode.** Each call integrates from t to tend in one shot; intermediate output requires repeated calls with shorter tend. The reverse-communication variant is the exception by construction.
+* **No NaN/Inf checking.** A right-hand side returning non-finite values propagates silently through the error norm and acceptance test.
+* **No dense output or event detection.** Bogacki–Shampine admits a cheap cubic Hermite interpolant from the FSAL stages, but it is not exposed; there is no root-finding facility.
+* **Explicit method on a mildly stiff problem.** RK23 needs ~137 000 steps for Robertson on `[0, 100]` where a stiff solver would need a few hundred. This is accepted because the goal is callback overhead, not solver quality.
