@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 """
 Robertson stiff ODE system solved with SciPy's solve_ivp (method='RK23').
 

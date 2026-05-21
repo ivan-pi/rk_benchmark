@@ -70,7 +70,7 @@ cmake --build build -j
 To produce a horizontal bar-chart PNG of mean time per step with gnuplot:
 
 ```bash
-gnuplot scripts/plot_mean_time_per_step.gp
+./scripts/plot_mean_time_per_step.gp
 # output: scripts/mean_time_per_step.png
 ```
 

@@ -1,3 +1,5 @@
+#!/usr/bin/env gnuplot
+
 reset session
 
 set terminal pngcairo size 800,600 enhanced font "Arial,12"
