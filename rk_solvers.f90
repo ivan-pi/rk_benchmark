@@ -30,6 +30,15 @@ module rk_solvers
     end subroutine rk23_cptr_external_impl
   end interface
 
+
+  interface
+    function cbrt(x) bind(c,name="cbrt")
+      use, intrinsic :: iso_c_binding, only: c_double
+      real(c_double), value :: x
+      real(c_double) :: cbrt
+    end function
+  end interface
+
 contains
 
   pure function weighted_norm(n, y_old, y_next, err_vec, a_tol, r_tol) result(err_val)
@@ -83,7 +92,7 @@ contains
 
         call rk23_step(neqn, fun, t, h, y, work(:,1), work(:,2), work(:,3), work(:,4), work(:,5), atol, rtol, y_new, err)
         stats%nfev = stats%nfev + 3
-        fac = 0.9_dp * (1.0_dp / max(err, 1.0e-10_dp))**(1.0_dp/3.0_dp)
+        fac = 0.9_dp * cbrt(1.0_dp / max(err, 1.0e-10_dp))
 
         if (err < 1.0_dp) then
           if (step_rejected) fac = min(1.0_dp, fac)
@@ -161,7 +170,7 @@ contains
         call rk23_step(neqn, fun, t, h, y, work(:,1), work(:,2), work(:,3), &
                        work(:,4), work(:,5), atol, rtol, rpar, ipar, y_new, err)
         stats%nfev = stats%nfev + 3
-        fac = 0.9_dp * (1.0_dp / max(err, 1.0e-10_dp))**(1.0_dp/3.0_dp)
+        fac = 0.9_dp * cbrt(1.0_dp / max(err, 1.0e-10_dp))
 
         if (err < 1.0_dp) then
           if (step_rejected) fac = min(1.0_dp, fac)
@@ -240,7 +249,7 @@ contains
 
         call rk23_step(neqn, fun, t, h, y, work(:,1), work(:,2), work(:,3), work(:,4), work(:,5), atol, rtol, ctx, y_new, err)
         stats%nfev = stats%nfev + 3
-        fac = 0.9_dp * (1.0_dp / max(err, 1.0e-10_dp))**(1.0_dp/3.0_dp)
+        fac = 0.9_dp * cbrt(1.0_dp / max(err, 1.0e-10_dp))
 
         if (err < 1.0_dp) then
           if (step_rejected) fac = min(1.0_dp, fac)
@@ -336,7 +345,7 @@ contains
 
         call rk23_step(neqn, fun, t, h, y, work(:,1), work(:,2), work(:,3), work(:,4), work(:,5), atol, rtol, y_new, err)
         stats%nfev = stats%nfev + 3
-        fac = 0.9_dp * (1.0_dp / max(err, 1.0e-10_dp))**(1.0_dp/3.0_dp)
+        fac = 0.9_dp * cbrt(1.0_dp / max(err, 1.0e-10_dp))
 
         if (err < 1.0_dp) then
           if (step_rejected) fac = min(1.0_dp, fac)
@@ -420,7 +429,7 @@ contains
                         1.0_dp/9.0_dp * work(:,3) - 1.0_dp/8.0_dp * work(:,4))
 
         err = weighted_norm(neqn, y, work(:,5), err_vec, atol, rtol)
-        fac = 0.9_dp * (1.0_dp / max(err, 1.0e-10_dp))**(1.0_dp/3.0_dp)
+        fac = 0.9_dp * cbrt(1.0_dp / max(err, 1.0e-10_dp))
 
         stats%nfev = stats%nfev + 3
         if (err < 1.0_dp) then
@@ -478,7 +487,7 @@ contains
 
         call rk23_step(neqn, fun, t, h, y, work(:,1), work(:,2), work(:,3), work(:,4), work(:,5), atol, rtol, ctx, y_new, err)
         stats%nfev = stats%nfev + 3
-        fac = 0.9_dp * (1.0_dp / max(err, 1.0e-10_dp))**(1.0_dp/3.0_dp)
+        fac = 0.9_dp * cbrt(1.0_dp / max(err, 1.0e-10_dp))
 
         if (err < 1.0_dp) then
           if (step_rejected) fac = min(1.0_dp, fac)
