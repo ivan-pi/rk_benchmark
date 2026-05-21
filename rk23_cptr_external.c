@@ -8,7 +8,7 @@ typedef struct {
 } rk_stats;
 
 typedef void (*rk23_rhs_fn)(int neqn, double t, const double y[restrict static neqn],
-                            double ydot[restrict static neqn], const void *ctx);
+                            double ydot[restrict static neqn], void *ctx);
 
 static double weighted_norm(int n, const double y_old[restrict static n],
                             const double y_next[restrict static n],
@@ -31,8 +31,7 @@ static void rk23_step(int n, rk23_rhs_fn fun, double t_cur, double dt,
                       double k3[restrict static n], double k4[restrict static n],
                       double tmp[restrict static n],
                       const double a_tol[restrict static n], double r_tol,
-                      const void *ctx, double y_next[restrict static n],
-                      double *err_val) {
+                      void *ctx, double y_next[restrict static n], double *err_val) {
   for (int i = 0; i < n; ++i) {
     tmp[i] = y_cur[i] + dt * 0.5 * k1[i];
   }
@@ -58,7 +57,7 @@ static void rk23_step(int n, rk23_rhs_fn fun, double t_cur, double dt,
 void rk23_cptr_external(int neqn, rk23_rhs_fn fun, double *t,
                         double y[restrict static neqn], double tend, double *h,
                         const double atol[restrict static neqn], double rtol,
-                        double work[restrict static 5 * neqn], const void *ctx, int *idid,
+                        double work[restrict static 5 * neqn], void *ctx, int *idid,
                         rk_stats *stats) {
   int n = neqn;
   double t_cur = *t;
