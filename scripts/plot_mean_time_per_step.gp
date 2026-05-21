@@ -12,6 +12,8 @@ set xtics nomirror
 set key off
 
 system "./build/rk_benchmark > /dev/null"
+stats "build/mean_time_per_step.dat" using 2 nooutput
+label_offset = (STATS_max > 0 ? STATS_max * 0.01 : 0.001)
 plot "build/mean_time_per_step.dat" using 2:1:yticlabels(3) with boxes lc rgb "#6fa8dc" notitle, \
-     "build/mean_time_per_step.dat" using ($2 + (GPVAL_X_MAX * 0.01)):1:(sprintf("%.1f", $2)) \
+     "build/mean_time_per_step.dat" using ($2 + label_offset):1:(sprintf("%.1f", $2)) \
        with labels left notitle
