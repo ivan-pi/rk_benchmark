@@ -30,8 +30,8 @@ module rk_types
       import :: c_double, c_int, c_ptr
       integer(c_int), value :: neqn
       real(c_double), value :: t
-      real(c_double), intent(in)  :: y(*)
-      real(c_double), intent(out) :: ydot(*)
+      real(c_double), intent(in)  :: y(neqn)
+      real(c_double), intent(out) :: ydot(neqn)
       type(c_ptr), value :: ctx
     end subroutine func_cptr
 

@@ -36,8 +36,8 @@ contains
   subroutine rob_cptr(neqn, t, y, ydot, ctx) bind(c)
     integer(c_int), value :: neqn
     real(c_double), value :: t
-    real(c_double), intent(in) :: y(*)
-    real(c_double), intent(out) :: ydot(*)
+    real(c_double), intent(in) :: y(neqn)
+    real(c_double), intent(out) :: ydot(neqn)
     type(c_ptr), value :: ctx
     type(robertson_ctx), pointer :: d
     call c_f_pointer(ctx, d)
