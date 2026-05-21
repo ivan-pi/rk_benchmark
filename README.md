@@ -40,7 +40,8 @@ rk_solvers.f90       – solver variants plus the explicit-interface wrapper for
 rk23_cptr_external.c – optional C implementation of the rk23_cptr solver
 robertson_models.f90 – Robertson RHS implementations for each strategy
 rk_benchmark.F90     – driver: reports mean time per integration over N_runs loops
-euler_benchmark.f90  – fixed-step forward Euler benchmark using the same Robertson callback variants
+rk_forward_euler.f90 – fixed-step Euler runners used by the Euler callback benchmark
+euler_benchmark.f90  – driver for the fixed-step forward Euler callback benchmark
 scripts/             – helper scripts and reference implementations
 CMakeLists.txt       – build system
 ```
