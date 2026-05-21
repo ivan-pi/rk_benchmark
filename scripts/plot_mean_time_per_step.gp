@@ -1,8 +1,8 @@
 #!/usr/bin/env gnuplot
 #
 # Usage:
-#   ./scripts/plot_mean_time_per_step.gp
-#   gnuplot -e 'ARG1="GFortran 14.2 - -O3"' scripts/plot_mean_time_per_step.gp
+#   gnuplot -c scripts/plot_mean_time_per_step.gp
+#   gnuplot -c scripts/plot_mean_time_per_step.gp "GFortran 14.2 - -O3"
 #
 # An optional positional argument (ARG1) sets the plot title.
 # If omitted, a default title is used.
