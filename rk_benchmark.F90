@@ -348,12 +348,12 @@ contains
       us_per_step = 0.0_dp
     end if
 
-    write(*,'(I2,A2,A30,F10.4,I8,I8,I8,F12.4)') &
+    write(*,'(I2,A2,A30,1X,G12.5,I8,I8,I8,1X,G12.5)') &
       id, ". ", label, mean_elapsed, s%accepted, s%rejected, s%nfev, &
       us_per_step
     if (present(plot_unit_out) .and. present(plot_data_enabled_out)) then
       if (plot_data_enabled_out) then
-        write(plot_unit_out,'(I2,1X,F12.4,1X,A)') id, us_per_step, '"'//trim(label)//'"'
+        write(plot_unit_out,'(I2,1X,G0.12,1X,A)') id, us_per_step, '"'//trim(label)//'"'
       end if
     end if
   end subroutine print_row
