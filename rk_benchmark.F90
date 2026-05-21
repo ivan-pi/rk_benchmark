@@ -3,7 +3,7 @@ program rk_benchmark
   use rk_types
   use rk_solvers, only: rk23_simple, rk23_par, rk23_tb, rk23_rci, rk23_class_star, rk_stats
 #ifdef USE_EXTERNAL_C_RK23
-  use rk_solvers, only: rk23_cptr => rk23_cptr_external
+  use rk_solvers, only: rk23_cptr => rk23_cptr_external_impl
 #else
   use rk_solvers, only: rk23_cptr
 #endif

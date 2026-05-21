@@ -5,11 +5,11 @@
 module rk_solvers
   use rk_kinds, only: dp
   use rk_types
-  use iso_c_binding, only: c_double, c_funloc, c_funptr, c_int, c_ptr
+  use iso_c_binding, only: c_double, c_funptr, c_int, c_ptr
   implicit none
   private
 
-  public :: rk23_simple, rk23_par, rk23_cptr, rk23_cptr_external, rk23_tb
+  public :: rk23_simple, rk23_par, rk23_cptr, rk23_cptr_external_impl, rk23_tb
   public :: rk23_rci, rk23_class_star
   public :: rk_stats
 
@@ -218,23 +218,23 @@ contains
   ! 3. C-Pointer Callback Integrator
   ! ============================================================================
   subroutine rk23_cptr(neqn, fun, t, y, tend, h, atol, rtol, work, ctx, idid, stats)
-    integer, intent(in) :: neqn
+    integer(c_int), value :: neqn
     procedure(func_cptr) :: fun
     real(dp), intent(inout) :: t, y(neqn), h
     real(dp), intent(in)    :: tend, atol(neqn), rtol
     real(dp), intent(inout) :: work(neqn, 5)
     type(c_ptr), value      :: ctx
-    integer,  intent(out)   :: idid
+    integer(c_int), intent(out) :: idid
     type(rk_stats), intent(out) :: stats
-
-    integer(c_int) :: neqn_c
+ 
+    integer :: neqn_f
     real(dp) :: err, fac, y_new(neqn)
     logical  :: step_rejected
-
-    neqn_c = neqn
+ 
+    neqn_f = int(neqn, kind(neqn_f))
     idid = 0
     stats = rk_stats()
-    call fun(neqn_c, t, y, work(:,1), ctx)
+    call fun(neqn, t, y, work(:,1), ctx)
     stats%nfev = stats%nfev + 1
 
     integrate: do while (t < tend)
@@ -243,11 +243,11 @@ contains
 
       attempt: do
         if (h <= spacing(t)) then
-          idid = -1
+          idid = -1_c_int
           exit integrate
         end if
-
-        call rk23_step(neqn, fun, t, h, y, work(:,1), work(:,2), work(:,3), work(:,4), work(:,5), atol, rtol, ctx, y_new, err)
+ 
+        call rk23_step(neqn_f, fun, t, h, y, work(:,1), work(:,2), work(:,3), work(:,4), work(:,5), atol, rtol, ctx, y_new, err)
         stats%nfev = stats%nfev + 3
         fac = 0.9_dp * cbrt(1.0_dp / max(err, 1.0e-10_dp))
 
@@ -293,24 +293,6 @@ contains
     end subroutine rk23_step
 
   end subroutine rk23_cptr
-
-
-  subroutine rk23_cptr_external(neqn, fun, t, y, tend, h, atol, rtol, work, ctx, idid, stats)
-    integer, intent(in) :: neqn
-    procedure(func_cptr) :: fun
-    real(dp), intent(inout) :: t, y(neqn), h
-    real(dp), intent(in)    :: tend, atol(neqn), rtol
-    real(dp), intent(inout) :: work(neqn, 5)
-    type(c_ptr), value      :: ctx
-    integer,  intent(out)   :: idid
-    type(rk_stats), intent(out) :: stats
-
-    integer(c_int) :: neqn_c, idid_c
-
-    neqn_c = neqn
-    call rk23_cptr_external_impl(neqn_c, c_funloc(fun), t, y, tend, h, atol, rtol, work, ctx, idid_c, stats)
-    idid = idid_c
-  end subroutine rk23_cptr_external
 
 
   ! ============================================================================
