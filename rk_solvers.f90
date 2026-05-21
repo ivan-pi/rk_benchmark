@@ -85,7 +85,7 @@ contains
       step_rejected = .false.
 
       attempt: do
-        if (h <= spacing(t)) then
+        if (abs(h) <= 10.0_dp * spacing(t)) then
           idid = -1
           exit integrate
         end if
@@ -162,7 +162,7 @@ contains
       step_rejected = .false.
 
       attempt: do
-        if (h <= spacing(t)) then
+        if (abs(h) <= 10.0_dp * spacing(t)) then
           idid = -1
           exit integrate
         end if
@@ -242,7 +242,7 @@ contains
       step_rejected = .false.
 
       attempt: do
-        if (h <= spacing(t)) then
+        if (abs(h) <= 10.0_dp * spacing(t)) then
           idid = -1_c_int
           exit integrate
         end if
@@ -318,7 +318,7 @@ contains
       step_rejected = .false.
 
       attempt: do
-        if (h <= spacing(t)) then
+        if (abs(h) <= 10.0_dp * spacing(t)) then
           idid = -1
           exit integrate
         end if
@@ -390,7 +390,7 @@ contains
       case(1) ! Step begins: work(:,1) is already valid. Prepare inputs for k2.
         if (t >= tend) then; stage = 6; return; end if
         if (t + h > tend) h = tend - t
-        if (h <= spacing(t)) then; idid = -1; stage = 6; return; end if
+        if (abs(h) <= 10.0_dp * spacing(t)) then; idid = -1; stage = 6; return; end if
 
         t_eval = t + 0.5_dp * h; y_eval = y + h * 0.5_dp * work(:,1)
         stage = 2; return ! Yield to evaluate f2 into work(:,2)
@@ -460,7 +460,7 @@ contains
       step_rejected = .false.
 
       attempt: do
-        if (h <= spacing(t)) then
+        if (abs(h) <= 10.0_dp * spacing(t)) then
           idid = -1
           exit integrate
         end if
