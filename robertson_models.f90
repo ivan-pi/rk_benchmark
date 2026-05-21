@@ -1,6 +1,7 @@
 module robertson_models
   use rk_kinds
   use rk_types
+  use iso_fortran_env, only: error_unit
   implicit none
 
   ! Robertson coefficients
@@ -78,9 +79,8 @@ contains
       ydot(2) =  d%k1*y(1) - d%k2*y(2)*y(3) - d%k3*y(2)**2
       ydot(3) =  d%k3*y(2)**2
     class default
+      write(error_unit,'(A)') "robertson_models: wrong type of ctx argument in rob_class_star"
       error stop 99
-      ! In a production code, handle the error.
-      ! Omitted here to avoid branching overhead in the benchmark.
     end select
   end subroutine rob_class_star
 
