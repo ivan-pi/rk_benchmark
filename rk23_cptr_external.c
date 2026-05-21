@@ -7,8 +7,8 @@ typedef struct {
   int nfev;
 } rk_stats;
 
-typedef void (*rk23_rhs_fn)(int neqn, double t, const double y[restrict static neqn],
-                            double ydot[restrict static neqn], void *ctx);
+typedef void (*rk23_rhs_fn)(int neqn, double t, const double y[],
+                            double ydot[], void *ctx);
 
 static double weighted_norm(int n, const double y_old[restrict static n],
                             const double y_next[restrict static n],
