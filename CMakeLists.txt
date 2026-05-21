@@ -5,22 +5,27 @@ project(rk_benchmark VERSION 0.1.0 LANGUAGES C Fortran)
 option(ENABLE_C_SOLVER "Use the external C rk23_cptr replacement in the benchmark driver" OFF)
 option(ENABLE_LTO "Enable IPO/LTO" OFF)
 
-add_library(rk_lib rk_kinds.f90 rk_types.f90 rk_solvers.f90 rk23_cptr_external.c)
+add_library(rk_lib
+  src/rk_kinds.f90
+  src/rk_types.f90
+  src/rk_solvers.f90
+  src/rk23_cptr_external.c)
 
-add_library(robertson_lib robertson_models.f90)
+add_library(robertson_lib src/robertson_models.f90)
 target_link_libraries(robertson_lib PRIVATE rk_lib)
 
-add_executable(rk_benchmark rk_benchmark.F90)
+add_executable(rk_benchmark src/rk_benchmark.F90)
 target_link_libraries(rk_benchmark PRIVATE rk_lib robertson_lib)
 
-add_executable(euler_benchmark rk_forward_euler.f90 euler_benchmark.f90)
+add_executable(euler_benchmark
+  src/rk_forward_euler.f90
+  src/euler_benchmark.f90)
 target_link_libraries(euler_benchmark PRIVATE rk_lib robertson_lib)
 
 if(ENABLE_C_SOLVER)
   target_compile_definitions(rk_benchmark PRIVATE USE_EXTERNAL_C_RK23)
 endif()
 
-#add_library(robertson_models PLUGIN robertson_models.f90)
 if(ENABLE_LTO)
   include(CheckIPOSupported)
   check_ipo_supported(RESULT result OUTPUT output)
