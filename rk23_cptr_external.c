@@ -85,7 +85,8 @@ void rk23_cptr_external(int neqn, rk23_rhs_fn fun, double *t,
     bool step_rejected = false;
 
     do {
-      if (h_cur <= fabs(nextafter(t_cur, INFINITY) - t_cur)) {
+      const double ulp = nextafter(t_cur, INFINITY) - t_cur;
+      if (fabs(h_cur) <= 10.0 * ulp) {
         *idid = -1;
         goto finish;
       }
