@@ -9,12 +9,12 @@ module rk_solvers
   implicit none
   private
 
-  public :: rk23_simple, rk23_par, rk23_cptr, rk23_cptr_external_impl, rk23_tb
+  public :: rk23_simple, rk23_par, rk23_cptr, rk23_cptr_external, rk23_tb
   public :: rk23_rci, rk23_class_star
   public :: rk_stats
 
   interface
-    subroutine rk23_cptr_external_impl(neqn, fun, t, y, tend, h, atol, rtol, work, ctx, idid, stats) &
+    subroutine rk23_cptr_external(neqn, fun, t, y, tend, h, atol, rtol, work, ctx, idid, stats) &
         bind(c, name="rk23_cptr_external")
       import :: c_double, c_funptr, c_int, c_ptr, rk_stats
       integer(c_int), value        :: neqn
@@ -27,7 +27,7 @@ module rk_solvers
       type(c_ptr), value           :: ctx
       integer(c_int), intent(out)  :: idid
       type(rk_stats), intent(out)  :: stats
-    end subroutine rk23_cptr_external_impl
+    end subroutine rk23_cptr_external
   end interface
 
 
@@ -217,7 +217,7 @@ contains
   ! ============================================================================
   ! 3. C-Pointer Callback Integrator
   ! ============================================================================
-  subroutine rk23_cptr(neqn, fun, t, y, tend, h, atol, rtol, work, ctx, idid, stats)
+  subroutine rk23_cptr(neqn, fun, t, y, tend, h, atol, rtol, work, ctx, idid, stats) bind(c)
     integer(c_int), value :: neqn
     type(c_funptr), value :: fun
     real(dp), intent(inout) :: t, y(neqn), h
@@ -227,12 +227,10 @@ contains
     integer(c_int), intent(out) :: idid
     type(rk_stats), intent(out) :: stats
  
-    integer :: neqn_f
     procedure(func_cptr), pointer :: fun_proc
     real(dp) :: err, fac, y_new(neqn)
     logical  :: step_rejected
  
-    neqn_f = int(neqn, kind(neqn_f))
     idid = 0
     stats = rk_stats()
     call c_f_procpointer(fun, fun_proc)
@@ -249,7 +247,7 @@ contains
           exit integrate
         end if
  
-        call rk23_step(neqn_f, fun_proc, t, h, y, work(:,1), work(:,2), work(:,3), &
+        call rk23_step(neqn, fun_proc, t, h, y, work(:,1), work(:,2), work(:,3), &
                        work(:,4), work(:,5), atol, rtol, ctx, y_new, err)
         stats%nfev = stats%nfev + 3
         fac = 0.9_dp * cbrt(1.0_dp / max(err, 1.0e-10_dp))
@@ -272,27 +270,24 @@ contains
 
   contains
     subroutine rk23_step(n, fn, t_cur, dt, y_cur, k1, k2, k3, k4, tmp, a_tol, r_tol, cctx, y_next, err_val)
-      integer,  intent(in)  :: n
+      integer(c_int), value :: n
       procedure(func_cptr) :: fn
       real(dp), intent(in)  :: t_cur, dt, y_cur(n), k1(n), a_tol(n), r_tol
       type(c_ptr), value    :: cctx
       real(dp), intent(out) :: k2(n), k3(n), k4(n), tmp(n), y_next(n), err_val
 
-      integer(c_int) :: n_c
-
-      n_c = n
       tmp = y_cur + dt * 0.5_dp * k1
-      call fn(n_c, t_cur + 0.5_dp*dt, tmp, k2, cctx)
-
+      call fn(n, t_cur + 0.5_dp*dt, tmp, k2, cctx)
+ 
       tmp = y_cur + dt * 0.75_dp * k2
-      call fn(n_c, t_cur + 0.75_dp*dt, tmp, k3, cctx)
-
+      call fn(n, t_cur + 0.75_dp*dt, tmp, k3, cctx)
+ 
       y_next = y_cur + dt * ((2.0_dp/9.0_dp)*k1 + (1.0_dp/3.0_dp)*k2 + (4.0_dp/9.0_dp)*k3)
-      call fn(n_c, t_cur + dt, y_next, k4, cctx)
-
+      call fn(n, t_cur + dt, y_next, k4, cctx)
+ 
       tmp = dt * (-5.0_dp/72.0_dp * k1 + 1.0_dp/12.0_dp * k2 + &
                    1.0_dp/9.0_dp * k3 - 1.0_dp/8.0_dp * k4)
-      err_val = weighted_norm(n, y_cur, y_next, tmp, a_tol, r_tol)
+      err_val = weighted_norm(int(n, kind(1)), y_cur, y_next, tmp, a_tol, r_tol)
     end subroutine rk23_step
 
   end subroutine rk23_cptr
