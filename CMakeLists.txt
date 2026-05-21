@@ -7,6 +7,12 @@ option(ENABLE_LTO "Enable IPO/LTO" OFF)
 
 add_library(rk_lib rk_kinds.f90 rk_types.f90 rk_solvers.f90 rk23_cptr_external.c)
 
+include(CheckLibraryExists)
+check_library_exists(m nextafter "" HAVE_LIBM_NEXTAFTER)
+if(HAVE_LIBM_NEXTAFTER)
+  target_link_libraries(rk_lib PRIVATE m)
+endif()
+
 add_library(robertson_lib robertson_models.f90)
 target_link_libraries(robertson_lib PRIVATE rk_lib)
 
