@@ -371,10 +371,12 @@ contains
     integer  :: stage
     real(dp) :: t_eval, y_eval(neqn)
     logical  :: step_rejected
+    type(step_controller) :: ctrl
 
     work = 0.0_dp
     idid = 0
     stats = rk_stats()
+    ctrl = step_controller()
 
     ! Evaluate the initial k1 directly into column 1
     call rob_direct(neqn, t, y, work(:, 1))
@@ -384,7 +386,7 @@ contains
 
     rci_loop: do
       call rk23_rci(stage, neqn, t, y, t_end, h, atol, rtol, work, &
-                    t_eval, y_eval, idid, stats, step_rejected)
+                    t_eval, y_eval, idid, stats, step_rejected, ctrl)
       select case(stage)
       case(2:4)
         call rob_direct(neqn, t_eval, y_eval, work(:, stage))
