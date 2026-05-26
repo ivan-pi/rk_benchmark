@@ -108,7 +108,7 @@ indicate an implementation error.
 The six `rk23_*` routines exist to compare callback dispatch overhead, not to serve as production ODE solvers. The following limitations are intentional:
 
 * **Forward integration only.** All variants assume `tend > t` and `h > 0; the termination and endpoint-clipping logic is not direction-aware.
-* **Fixed I-controller.** Step-size adaptation uses a simple `fac = 0.9 * (1/err)^(1/3)` with `[0.2, 5.0]` clamping — no PI/PID controller, no stiffness detection.
+* **I or PI controller only.** Step-size adaptation uses either an I-controller (`fac = 0.9 * err^(-1/3)`) or a PI-controller (`fac = 0.9 * err_n^(-k1/3) * err_{n-1}^(-k2/3)` with defaults `k1=0.7`, `k2=0.4`), both with `[0.2, 5.0]` clamping; no PID controller or stiffness detection.
 * **No single-step mode.** Each call integrates from t to tend in one shot; intermediate output requires repeated calls with shorter tend. The reverse-communication variant is the exception by construction.
 * **No NaN/Inf checking.** A right-hand side returning non-finite values propagates silently through the error norm and acceptance test.
 * **No dense output or event detection.** Bogacki–Shampine admits a cheap cubic Hermite interpolant from the FSAL stages, but it is not exposed; there is no root-finding facility.

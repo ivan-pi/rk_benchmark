@@ -14,7 +14,7 @@ module rk_solvers
   public :: rk_stats
 
   interface
-    subroutine rk23_cptr_external(neqn, fun, t, y, tend, h, atol, rtol, work, ctx, idid, stats) &
+    subroutine rk23_cptr_external_c(neqn, fun, t, y, tend, h, atol, rtol, work, ctx, idid, stats, controller_kind) &
         bind(c, name="rk23_cptr_external")
       import :: c_double, c_funptr, c_int, c_ptr, rk_stats
       integer(c_int), value        :: neqn
@@ -27,19 +27,32 @@ module rk_solvers
       type(c_ptr), value           :: ctx
       integer(c_int), intent(out)  :: idid
       type(rk_stats), intent(out)  :: stats
-    end subroutine rk23_cptr_external
-  end interface
-
-
-  interface
-    function cbrt(x) bind(c,name="cbrt")
-      use, intrinsic :: iso_c_binding, only: c_double
-      real(c_double), value :: x
-      real(c_double) :: cbrt
-    end function
+      integer(c_int), value        :: controller_kind
+    end subroutine rk23_cptr_external_c
   end interface
 
 contains
+
+  subroutine rk23_cptr_external(neqn, fun, t, y, tend, h, atol, rtol, work, ctx, idid, stats, ctrl)
+    integer(c_int), value        :: neqn
+    type(c_funptr), value        :: fun
+    real(c_double), intent(inout) :: t, h
+    real(c_double), intent(inout) :: y(*)
+    real(c_double), value        :: tend, rtol
+    real(c_double), intent(in)   :: atol(*)
+    real(c_double), intent(inout) :: work(*)
+    type(c_ptr), value           :: ctx
+    integer(c_int), intent(out)  :: idid
+    type(rk_stats), intent(out)  :: stats
+    type(step_controller), intent(inout), optional, target :: ctrl
+
+    integer(c_int) :: controller_kind
+
+    controller_kind = CTRL_I
+    if (present(ctrl)) controller_kind = int(ctrl%kind, c_int)
+
+    call rk23_cptr_external_c(neqn, fun, t, y, tend, h, atol, rtol, work, ctx, idid, stats, controller_kind)
+  end subroutine rk23_cptr_external
 
   pure function weighted_norm(n, y_old, y_next, err_vec, a_tol, r_tol) result(err_val)
     integer, intent(in)  :: n
@@ -62,7 +75,7 @@ contains
   !    interface.  Per Fortran 2008, an internal procedure may still be passed
   !    as the actual argument.
   ! ============================================================================
-  subroutine rk23_simple(neqn, fun, t, y, tend, h, atol, rtol, work, idid, stats)
+  subroutine rk23_simple(neqn, fun, t, y, tend, h, atol, rtol, work, idid, stats, ctrl)
     integer, intent(in) :: neqn
     external :: fun
     real(dp), intent(inout) :: t, y(neqn), h
@@ -70,12 +83,22 @@ contains
     real(dp), intent(inout) :: work(neqn, 5)
     integer,  intent(out)   :: idid
     type(rk_stats), intent(out) :: stats
+    type(step_controller), intent(inout), optional, target :: ctrl
 
-    real(dp) :: err, fac, y_new(neqn)
+    real(dp) :: err, y_new(neqn)
     logical  :: step_rejected
+    type(step_controller), target :: ctrl_default
+    type(step_controller), pointer :: ctrl_state
 
     idid = 0
     stats = rk_stats()
+    if (present(ctrl)) then
+      ctrl_state => ctrl
+    else
+      ctrl_default = step_controller()
+      ctrl_state => ctrl_default
+    end if
+    call ctrl_state%reject()
     ! Evaluate initial k1 directly into column 1
     call fun(neqn, t, y, work(:,1))
     stats%nfev = stats%nfev + 1
@@ -92,20 +115,20 @@ contains
 
         call rk23_step(neqn, fun, t, h, y, work(:,1), work(:,2), work(:,3), work(:,4), work(:,5), atol, rtol, y_new, err)
         stats%nfev = stats%nfev + 3
-        fac = 0.9_dp * cbrt(1.0_dp / max(err, 1.0e-10_dp))
 
         if (err < 1.0_dp) then
-          if (step_rejected) fac = min(1.0_dp, fac)
           t = t + h
           y = y_new
           work(:,1) = work(:,4) ! FSAL: k4 of accepted step becomes k1 of next
-          h = h * max(0.2_dp, min(5.0_dp, fac))
+          h = ctrl_state%next_h(err, h, 2, step_rejected)
+          call ctrl_state%accept(err)
           stats%accepted = stats%accepted + 1
           exit attempt
         end if
 
         ! Rejected: t and y are unchanged, so work(:,1) is still the valid k1
-        h = h * max(0.2_dp, min(5.0_dp, fac))
+        h = ctrl_state%next_h(err, h, 2, .false.)
+        call ctrl_state%reject()
         step_rejected = .true.
         stats%rejected = stats%rejected + 1
       end do attempt
@@ -138,7 +161,7 @@ contains
   ! ============================================================================
   ! 2. SLATEC-like Callback (rpar, ipar) Integrator
   ! ============================================================================
-  subroutine rk23_par(neqn, fun, t, y, tend, h, atol, rtol, work, rpar, ipar, idid, stats)
+  subroutine rk23_par(neqn, fun, t, y, tend, h, atol, rtol, work, rpar, ipar, idid, stats, ctrl)
     integer, intent(in) :: neqn
     procedure(func_par) :: fun
     real(dp), intent(inout) :: t, y(neqn), h
@@ -148,12 +171,22 @@ contains
     integer,  intent(inout) :: ipar(*)
     integer,  intent(out)   :: idid
     type(rk_stats), intent(out) :: stats
+    type(step_controller), intent(inout), optional, target :: ctrl
 
-    real(dp) :: err, fac, y_new(neqn)
+    real(dp) :: err, y_new(neqn)
     logical  :: step_rejected
+    type(step_controller), target :: ctrl_default
+    type(step_controller), pointer :: ctrl_state
 
     idid = 0
     stats = rk_stats()
+    if (present(ctrl)) then
+      ctrl_state => ctrl
+    else
+      ctrl_default = step_controller()
+      ctrl_state => ctrl_default
+    end if
+    call ctrl_state%reject()
     call fun(neqn, t, y, work(:,1), rpar, ipar)
     stats%nfev = stats%nfev + 1
 
@@ -170,19 +203,19 @@ contains
         call rk23_step(neqn, fun, t, h, y, work(:,1), work(:,2), work(:,3), &
                        work(:,4), work(:,5), atol, rtol, rpar, ipar, y_new, err)
         stats%nfev = stats%nfev + 3
-        fac = 0.9_dp * cbrt(1.0_dp / max(err, 1.0e-10_dp))
 
         if (err < 1.0_dp) then
-          if (step_rejected) fac = min(1.0_dp, fac)
           t = t + h
           y = y_new
           work(:,1) = work(:,4)
-          h = h * max(0.2_dp, min(5.0_dp, fac))
+          h = ctrl_state%next_h(err, h, 2, step_rejected)
+          call ctrl_state%accept(err)
           stats%accepted = stats%accepted + 1
           exit attempt
         end if
 
-        h = h * max(0.2_dp, min(5.0_dp, fac))
+        h = ctrl_state%next_h(err, h, 2, .false.)
+        call ctrl_state%reject()
         step_rejected = .true.
         stats%rejected = stats%rejected + 1
       end do attempt
@@ -217,7 +250,7 @@ contains
   ! ============================================================================
   ! 3. C-Pointer Callback Integrator
   ! ============================================================================
-  subroutine rk23_cptr(neqn, fun, t, y, tend, h, atol, rtol, work, ctx, idid, stats) bind(c)
+  subroutine rk23_cptr(neqn, fun, t, y, tend, h, atol, rtol, work, ctx, idid, stats, ctrl)
     integer(c_int), value :: neqn
     type(c_funptr), value :: fun
     real(dp), intent(inout) :: t, y(neqn), h
@@ -226,13 +259,23 @@ contains
     type(c_ptr), value      :: ctx
     integer(c_int), intent(out) :: idid
     type(rk_stats), intent(out) :: stats
+    type(step_controller), intent(inout), optional, target :: ctrl
  
     procedure(func_cptr), pointer :: fun_proc
-    real(dp) :: err, fac, y_new(neqn)
+    real(dp) :: err, y_new(neqn)
     logical  :: step_rejected
+    type(step_controller), target :: ctrl_default
+    type(step_controller), pointer :: ctrl_state
  
     idid = 0
     stats = rk_stats()
+    if (present(ctrl)) then
+      ctrl_state => ctrl
+    else
+      ctrl_default = step_controller()
+      ctrl_state => ctrl_default
+    end if
+    call ctrl_state%reject()
     call c_f_procpointer(fun, fun_proc)
     call fun_proc(neqn, t, y, work(:,1), ctx)
     stats%nfev = stats%nfev + 1
@@ -250,19 +293,19 @@ contains
         call rk23_step(neqn, fun_proc, t, h, y, work(:,1), work(:,2), work(:,3), &
                        work(:,4), work(:,5), atol, rtol, ctx, y_new, err)
         stats%nfev = stats%nfev + 3
-        fac = 0.9_dp * cbrt(1.0_dp / max(err, 1.0e-10_dp))
 
         if (err < 1.0_dp) then
-          if (step_rejected) fac = min(1.0_dp, fac)
           t = t + h
           y = y_new
           work(:,1) = work(:,4)
-          h = h * max(0.2_dp, min(5.0_dp, fac))
+          h = ctrl_state%next_h(err, h, 2, step_rejected)
+          call ctrl_state%accept(err)
           stats%accepted = stats%accepted + 1
           exit attempt
         end if
 
-        h = h * max(0.2_dp, min(5.0_dp, fac))
+        h = ctrl_state%next_h(err, h, 2, .false.)
+        call ctrl_state%reject()
         step_rejected = .true.
         stats%rejected = stats%rejected + 1
       end do attempt
@@ -296,7 +339,7 @@ contains
   ! ============================================================================
   ! 4. Functor OOP Class Integrator
   ! ============================================================================
-  subroutine rk23_tb(neqn, fun, t, y, tend, h, atol, rtol, work, idid, stats)
+  subroutine rk23_tb(neqn, fun, t, y, tend, h, atol, rtol, work, idid, stats, ctrl)
     integer, intent(in) :: neqn
     class(ode_functor), intent(inout) :: fun
     real(dp), intent(inout) :: t, y(neqn), h
@@ -304,12 +347,22 @@ contains
     real(dp), intent(inout) :: work(neqn, 5)
     integer,  intent(out)   :: idid
     type(rk_stats), intent(out) :: stats
+    type(step_controller), intent(inout), optional, target :: ctrl
 
-    real(dp) :: err, fac, y_new(neqn)
+    real(dp) :: err, y_new(neqn)
     logical  :: step_rejected
+    type(step_controller), target :: ctrl_default
+    type(step_controller), pointer :: ctrl_state
 
     idid = 0
     stats = rk_stats()
+    if (present(ctrl)) then
+      ctrl_state => ctrl
+    else
+      ctrl_default = step_controller()
+      ctrl_state => ctrl_default
+    end if
+    call ctrl_state%reject()
     call fun%eval(neqn, t, y, work(:,1))
     stats%nfev = stats%nfev + 1
 
@@ -325,19 +378,19 @@ contains
 
         call rk23_step(neqn, fun, t, h, y, work(:,1), work(:,2), work(:,3), work(:,4), work(:,5), atol, rtol, y_new, err)
         stats%nfev = stats%nfev + 3
-        fac = 0.9_dp * cbrt(1.0_dp / max(err, 1.0e-10_dp))
 
         if (err < 1.0_dp) then
-          if (step_rejected) fac = min(1.0_dp, fac)
           t = t + h
           y = y_new
           work(:,1) = work(:,4)
-          h = h * max(0.2_dp, min(5.0_dp, fac))
+          h = ctrl_state%next_h(err, h, 2, step_rejected)
+          call ctrl_state%accept(err)
           stats%accepted = stats%accepted + 1
           exit attempt
         end if
 
-        h = h * max(0.2_dp, min(5.0_dp, fac))
+        h = ctrl_state%next_h(err, h, 2, .false.)
+        call ctrl_state%reject()
         step_rejected = .true.
         stats%rejected = stats%rejected + 1
       end do attempt
@@ -372,7 +425,7 @@ contains
   ! Caller passes k1 into work(:,1) before entering the loop.
   ! ============================================================================
   subroutine rk23_rci(stage, neqn, t, y, tend, h, atol, rtol, work, &
-                      t_eval, y_eval, idid, stats, step_rejected)
+                      t_eval, y_eval, idid, stats, step_rejected, ctrl)
     integer,  intent(inout) :: stage
     integer,  intent(in)    :: neqn
     real(dp), intent(inout) :: t, y(neqn), h
@@ -382,8 +435,21 @@ contains
     integer,  intent(out)   :: idid
     type(rk_stats), intent(inout) :: stats
     logical,  intent(inout) :: step_rejected
+    type(step_controller), intent(inout), optional, target :: ctrl
 
-    real(dp) :: err, fac, err_vec(neqn)
+    real(dp) :: err, err_vec(neqn)
+    type(step_controller), target :: ctrl_default
+    type(step_controller), pointer :: ctrl_state
+
+    if (present(ctrl)) then
+      ctrl_state => ctrl
+    else
+      ctrl_default = step_controller()
+      ctrl_state => ctrl_default
+    end if
+    if (stage == 1 .and. stats%accepted == 0 .and. stats%rejected == 0) then
+      call ctrl_state%reject()
+    end if
 
     drive: do
       select case(stage)
@@ -409,22 +475,23 @@ contains
                         1.0_dp/9.0_dp * work(:,3) - 1.0_dp/8.0_dp * work(:,4))
 
         err = weighted_norm(neqn, y, work(:,5), err_vec, atol, rtol)
-        fac = 0.9_dp * cbrt(1.0_dp / max(err, 1.0e-10_dp))
 
         stats%nfev = stats%nfev + 3
         if (err < 1.0_dp) then
-          if (step_rejected) fac = min(1.0_dp, fac)
           t = t + h
           y = work(:,5)
           work(:,1) = work(:,4) ! FSAL: k4 becomes k1
+          h = ctrl_state%next_h(err, h, 2, step_rejected)
+          call ctrl_state%accept(err)
           step_rejected = .false. ! reset for the next step
           stats%accepted = stats%accepted + 1
         else
+          h = ctrl_state%next_h(err, h, 2, .false.)
+          call ctrl_state%reject()
           step_rejected = .true.
           stats%rejected = stats%rejected + 1
         end if
 
-        h = h * max(0.2_dp, min(5.0_dp, fac))
         stage = 1 ! Cycle internally back to start of step (or retry)
 
       case default
@@ -437,7 +504,7 @@ contains
   ! ============================================================================
   ! 6. Unlimited Polymorphic Class(*) Callback Integrator
   ! ============================================================================
-  subroutine rk23_class_star(neqn, fun, t, y, tend, h, atol, rtol, work, ctx, idid, stats)
+  subroutine rk23_class_star(neqn, fun, t, y, tend, h, atol, rtol, work, ctx, idid, stats, ctrl)
     integer, intent(in) :: neqn
     procedure(func_class_star) :: fun
     real(dp), intent(inout) :: t, y(neqn), h
@@ -446,12 +513,22 @@ contains
     class(*), intent(inout) :: ctx
     integer,  intent(out)   :: idid
     type(rk_stats), intent(out) :: stats
+    type(step_controller), intent(inout), optional, target :: ctrl
 
-    real(dp) :: err, fac, y_new(neqn)
+    real(dp) :: err, y_new(neqn)
     logical  :: step_rejected
+    type(step_controller), target :: ctrl_default
+    type(step_controller), pointer :: ctrl_state
 
     idid = 0
     stats = rk_stats()
+    if (present(ctrl)) then
+      ctrl_state => ctrl
+    else
+      ctrl_default = step_controller()
+      ctrl_state => ctrl_default
+    end if
+    call ctrl_state%reject()
     call fun(neqn, t, y, work(:,1), ctx)
     stats%nfev = stats%nfev + 1
 
@@ -467,19 +544,19 @@ contains
 
         call rk23_step(neqn, fun, t, h, y, work(:,1), work(:,2), work(:,3), work(:,4), work(:,5), atol, rtol, ctx, y_new, err)
         stats%nfev = stats%nfev + 3
-        fac = 0.9_dp * cbrt(1.0_dp / max(err, 1.0e-10_dp))
 
         if (err < 1.0_dp) then
-          if (step_rejected) fac = min(1.0_dp, fac)
           t = t + h
           y = y_new
           work(:,1) = work(:,4)
-          h = h * max(0.2_dp, min(5.0_dp, fac))
+          h = ctrl_state%next_h(err, h, 2, step_rejected)
+          call ctrl_state%accept(err)
           stats%accepted = stats%accepted + 1
           exit attempt
         end if
 
-        h = h * max(0.2_dp, min(5.0_dp, fac))
+        h = ctrl_state%next_h(err, h, 2, .false.)
+        call ctrl_state%reject()
         step_rejected = .true.
         stats%rejected = stats%rejected + 1
       end do attempt

@@ -7,6 +7,9 @@ typedef struct {
   int nfev;
 } rk_stats;
 
+#define CTRL_I 1
+#define CTRL_PI 2
+
 typedef void (*rk23_rhs_fn)(int neqn, double t, const double y[],
                             double ydot[], void *ctx);
 
@@ -58,13 +61,15 @@ void rk23_cptr_external(int neqn, rk23_rhs_fn fun, double *t,
                         double y[restrict static neqn], double tend, double *h,
                         const double atol[restrict static neqn], double rtol,
                         double work[restrict static 5 * neqn], void *ctx, int *idid,
-                        rk_stats *stats) {
+                        rk_stats *stats, int controller_kind) {
   int n = neqn;
   double t_cur = *t;
   double h_cur = *h;
   double y_new[n];
   double err;
   double fac;
+  double err_prev = 1.0;
+  bool have_prev = false;
   double *restrict k1 = &work[0 * n];
   double *restrict k2 = &work[1 * n];
   double *restrict k3 = &work[2 * n];
@@ -93,7 +98,12 @@ void rk23_cptr_external(int neqn, rk23_rhs_fn fun, double *t,
 
       rk23_step(n, fun, t_cur, h_cur, y, k1, k2, k3, k4, tmp, atol, rtol, ctx, y_new, &err);
       stats->nfev += 3;
-      fac = 0.9 * cbrt(1.0 / fmax(err, 1.0e-10));
+      const double err_now = fmax(err, 1.0e-10);
+      if (controller_kind == CTRL_PI && have_prev) {
+        fac = 0.9 * pow(err_now, -0.7 / 3.0) * pow(fmax(err_prev, 1.0e-10), -0.4 / 3.0);
+      } else {
+        fac = 0.9 * pow(err_now, -1.0 / 3.0);
+      }
 
       if (err < 1.0) {
         if (step_rejected) {
@@ -106,12 +116,19 @@ void rk23_cptr_external(int neqn, rk23_rhs_fn fun, double *t,
           k1[i] = k4[i];
         }
         h_cur *= fmax(0.2, fmin(5.0, fac));
+        if (controller_kind == CTRL_PI) {
+          err_prev = err_now;
+          have_prev = true;
+        }
         stats->accepted += 1;
         break;
       }
 
       h_cur *= fmax(0.2, fmin(5.0, fac));
       step_rejected = true;
+      if (controller_kind == CTRL_PI) {
+        have_prev = false;
+      }
       stats->rejected += 1;
     } while (true);
   }
