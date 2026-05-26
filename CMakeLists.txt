@@ -14,6 +14,9 @@ add_library(rk_lib
 add_library(robertson_lib src/robertson_models.f90)
 target_link_libraries(robertson_lib PRIVATE rk_lib)
 
+add_library(rd_lib src/reaction_diffusion_models.f90)
+target_link_libraries(rd_lib PRIVATE rk_lib)
+
 add_executable(rk_benchmark src/rk_benchmark.F90)
 target_link_libraries(rk_benchmark PRIVATE rk_lib robertson_lib)
 
@@ -21,6 +24,9 @@ add_executable(euler_benchmark
   src/rk_forward_euler.f90
   src/euler_benchmark.f90)
 target_link_libraries(euler_benchmark PRIVATE rk_lib robertson_lib)
+
+add_executable(rd_benchmark src/rd_benchmark.F90)
+target_link_libraries(rd_benchmark PRIVATE rk_lib rd_lib)
 
 if(ENABLE_C_SOLVER)
   target_compile_definitions(rk_benchmark PRIVATE USE_EXTERNAL_C_RK23)
@@ -32,8 +38,10 @@ if(ENABLE_LTO)
   if(result)
     set_property(TARGET rk_lib PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
     set_property(TARGET robertson_lib PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
+    set_property(TARGET rd_lib PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
     set_property(TARGET rk_benchmark PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
     set_property(TARGET euler_benchmark PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
+    set_property(TARGET rd_benchmark PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
   else()
     message(WARNING "IPO is not supported: ${output}")
   endif()
