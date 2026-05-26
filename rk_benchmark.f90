@@ -3,8 +3,29 @@ program rk_benchmark
   use rk_types
   use rk_solvers
   use robertson_models
+  use plugin_path_mod
+  use iso_c_binding,   only: c_char, c_funptr, c_null_char, c_f_procpointer, c_associated
   use iso_fortran_env, only: error_unit
   implicit none
+
+  ! Interfaces for the C dlopen shim (dlopen_iface.c)
+  interface
+    function rkb_dlopen(path) result(handle) bind(c, name="rkb_dlopen")
+      import :: c_ptr, c_char
+      character(kind=c_char), intent(in) :: path(*)
+      type(c_ptr) :: handle
+    end function
+    function rkb_dlsym(handle, sym) result(fptr) bind(c, name="rkb_dlsym")
+      import :: c_ptr, c_funptr, c_char
+      type(c_ptr),            value      :: handle
+      character(kind=c_char), intent(in) :: sym(*)
+      type(c_funptr) :: fptr
+    end function
+    subroutine rkb_dlclose(handle) bind(c, name="rkb_dlclose")
+      import :: c_ptr
+      type(c_ptr), value :: handle
+    end subroutine
+  end interface
 
   integer,  parameter :: neqn = 3, N_runs = 100
   real(dp), parameter :: y_init(neqn) = [1.0_dp, 0.0_dp, 0.0_dp]
@@ -23,6 +44,11 @@ program rk_benchmark
   type(c_ptr) :: p_data
   type(robertson_functor) :: sys
   integer(8) :: t1, t2, count_rate
+
+  ! dlopen benchmark variables (case 7)
+  type(c_ptr)  :: dl_handle
+  type(c_funptr) :: raw_fp
+  procedure(func_cptr), pointer :: dyn_rob => null()
 
   work = 0.0_dp
 
@@ -143,6 +169,32 @@ program rk_benchmark
   call system_clock(t2)
   print '(A, F10.4, A, 3F12.4)', "6. Class(*) Select Type:      ", &
         real(t2-t1, dp)/real(count_rate, dp), " s | Final Y:", y
+
+
+  ! ----------------------------------------------------------------------------
+  ! 7. dlopen / Dynamic Loading  (compare with case 3 – same RHS, same ctx)
+  ! The function pointer is obtained at runtime via dlsym instead of being
+  ! resolved at link time; this measures any overhead from indirect dispatch.
+  ! ----------------------------------------------------------------------------
+  dl_handle = rkb_dlopen(robertson_plugin_path // c_null_char)
+  if (.not. c_associated(dl_handle)) then
+    write(error_unit,'(A)') "7. dlopen failed - skipping"
+  else
+    raw_fp = rkb_dlsym(dl_handle, "rob_cptr" // c_null_char)
+    call c_f_procpointer(raw_fp, dyn_rob)
+
+    call system_clock(t1)
+    do i = 1, N_runs
+      t = t_start; y = y_init; h = 1.0e-3_dp
+      call rk23_cptr(neqn, dyn_rob, t, y, t_end, h, atol, rtol, work, p_data, idid)
+      if (idid == -1) write(error_unit,*) "7. Step-size underflow!"
+    end do
+    call system_clock(t2)
+    print '(A, F10.4, A, 3F12.4)', "7. dlopen Dynamic Loading:    ", &
+          real(t2-t1, dp)/real(count_rate, dp), " s | Final Y:", y
+
+    call rkb_dlclose(dl_handle)
+  end if
 
 contains
 
